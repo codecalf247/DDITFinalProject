@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.or.ddit.employee.organizeChart.mapper.IOrgChartMapper">
+
+	<!-- 조직도에서 선택된 사원 정보 가져오기 -->
+	<select id="getOrgEmpInfo" parameterType="String" resultType="kr.or.ddit.vo.EmpVO">
+		select e.emp_no, e.dept_no, e.password, e.jbgd_cd, e.emp_nm, e.brdt, e.email, e.wnmpy_email, e.telno, 
+				e.ext_no, e.emp_zip, e.home_addr, e.home_daddr, e.jncmp_ymd, e.rsgntn_ymd, 
+				e.bank_cd, e.actno, e.dpstr_nm, e.salary, e.profile_file_path, e.sign_file_path, 
+				e.user_folder_usgqty, e.photo_key, e.enabled, wr.work_ymd
+		from emp e
+		left join work_rcord wr on(e.emp_no = wr.emp_no and wr.work_ymd >= to_char(sysdate, 'YYYYMMDD'))
+		where e.emp_no = #{empNo}
+	</select>
+
+</mapper>

@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.or.ddit.employee.eApproval.mapper.ITreeApprovalFormMapper">
+
+	<!-- documentList -->
+	<select id="getDocumentList" resultType="kr.or.ddit.vo.TreeVO">
+		select form_no as id,  
+		       case nvl(upper_form_no,0)
+		            when 0 then '#' 
+		            else to_char(upper_form_no)
+		       end as parent,
+		       form_nm as text  
+		from sanctn_form
+	</select>
+
+	<!-- documentDC -->
+	<select id="getDocumentDC" parameterType="int" resultType="String">
+		select form_dc
+		from sanctn_form
+		where form_no = #{formNo}
+	</select>
+	
+	<!-- documentLine -->
+	<select id="getApprovalLine" resultType="kr.or.ddit.vo.TreeVO">
+		select to_char(dept_no) as id,
+		       case nvl(upper_dept_no, 0)
+		      		when 0 then '#'
+		       		else to_char(upper_dept_no)
+		       end as parent,
+		       dept_nm as text,
+               null as sort_key
+		from dept
+		union all
+		select emp_no as id,
+		   	   to_char(e.dept_no) as parent,
+		       emp_nm || ' (' || cmd.cmmn_cd_nm || ')' as text,
+               cmd.cmmn_cd_nm as sort_key
+		from emp e
+		inner join cmmn_cd cmd on (cmd.cmmn_cd_id = e.jbgd_cd)
+		where enabled = '1'
+		order by sort_key desc, text
+	</select>
+</mapper>

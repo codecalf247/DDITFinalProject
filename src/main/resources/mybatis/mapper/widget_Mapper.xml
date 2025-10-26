@@ -1,0 +1,191 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.or.ddit.employee.main.mapper.IWidgetMapper">
+	
+	<select id="getAllWidget" parameterType="string" resultType="kr.or.ddit.vo.main.WidgetVO">
+		select
+		    ul.grid_master_no, layout_no, emp_no, grid_x, grid_y,
+		    widget_ty, widget_nm, widget_dc, default_width, default_height
+		from user_layout ul
+		inner join grid_master gm on (ul.grid_master_no = gm.grid_master_no)
+		where emp_no = #{empNo}
+	</select>
+	
+	<select id="getAttendanceWidget" parameterType="string" resultType="kr.or.ddit.vo.main.AttendanceWidgetVO">
+		select
+		    e.emp_nm
+		    ,e.profile_file_path
+		    ,cmd.cmmn_cd_nm as jbgd_nm
+		    ,d.dept_nm
+		    ,(select wr.begin_time
+		     from work_rcord wr
+		     where wr.emp_no = e.emp_no
+		       and wr.work_ymd = to_char(SYSDATE, 'YYYYMMDD')) as begin_time
+		    ,(select wr.end_time
+		     from work_rcord wr
+		     where wr.emp_no = e.emp_no
+		       and wr.work_ymd = to_char(SYSDATE, 'YYYYMMDD')) as end_time
+		from emp e
+		inner join cmmn_cd cmd on (cmd.cmmn_cd_id = e.jbgd_cd)
+		inner join dept d on (d.dept_no = e.dept_no)
+		where e.emp_no = #{empNo}
+	</select>	
+	
+	<select id="getTodoWidget" parameterType="string" resultType="kr.or.ddit.vo.main.TodoWidgetVO">
+		select
+    		todo_no, todo_cn, todo_check_yn, del_yn
+		from todo
+		where emp_no = #{empNo}
+		and del_yn = 'N'
+		order by todo_no
+	</select>
+	
+	<select id="getNoticeWidget" resultType="kr.or.ddit.vo.BoardVO">
+		select board_no, board_title, board_reg_dt, imprtnc_tag_yn
+		from (
+		    select b.board_no,
+		           b.board_title,
+		           b.board_reg_dt,
+		           b.imprtnc_tag_yn,
+		           row_number() over (
+		               order by 
+                       decode(b.imprtnc_tag_yn, 'Y', 1, 2) asc, 
+                       b.board_reg_dt desc
+		           ) as rn
+		    from board b
+		    where b.del_yn = 'N'
+            and b.board_ty = '02001'
+		)
+		where rn &lt;= 5
+	</select>
+	
+	<select id="getSchdulWidget" parameterType="kr.or.ddit.vo.EmpVO" resultType="kr.or.ddit.vo.SchdulVO">
+		SELECT
+		    schdul_no, emp_no, schdul_title, schdul_cn, start_dt, end_dt,
+		    text_color, background_color, allday_at, schdul_ty, dept_no, prjct_no
+		FROM schdul
+		WHERE (schdul_ty = '11001' AND emp_no = #{empNo})
+		   OR (schdul_ty = '11002' AND dept_no = #{deptNo})
+		   OR schdul_ty = '11003'
+		   OR schdul_ty = '11004'
+	</select>
+	
+	<insert id="insertSchdule" parameterType="kr.or.ddit.vo.SchdulVO" useGeneratedKeys="true">
+		<selectKey keyProperty="schdulNo" resultType="int" order="BEFORE">
+			SELECT seq_schdul.nextval FROM dual
+		</selectKey>
+		INSERT INTO SCHDUL(
+			schdul_no, emp_no, schdul_title, schdul_cn, start_dt, end_dt,
+    		text_color, background_color, allday_at, schdul_ty, dept_no, prjct_no
+		)VALUES(
+			#{schdulNo}, #{empNo}, #{schdulTitle}, #{schdulCn}, #{startDt}, #{endDt},
+			#{textColor}, #{backgroundColor}, #{alldayAt}, #{schdulTy}, #{deptNo}, #{prjctNo}
+		)
+	</insert>
+	
+	<select id="getSchdulByNo" parameterType="int" resultType="kr.or.ddit.vo.SchdulVO">
+		SELECT 
+			schdul_no, emp_no, schdul_title, schdul_cn, start_dt, end_dt,
+    		text_color, background_color, allday_at, schdul_ty, dept_no, prjct_no
+    	FROM SCHDUL
+    	WHERE schdul_no = #{schdulNo}
+	</select>
+	
+	<update id="updateSchdul" parameterType="kr.or.ddit.vo.SchdulVO">
+		UPDATE SCHDUL 
+		SET
+			schdul_title = #{schdulTitle},
+			schdul_cn = #{schdulCn}, 
+			start_dt = #{startDt}, 
+			end_dt = #{endDt}
+		WHERE
+			schdul_no = #{schdulNo}
+	</update>
+	
+	<delete id="deleteSchdul" parameterType="int">
+		DELETE SCHDUL
+		WHERE schdul_no = #{schdulNo}
+	</delete>
+	
+	
+	<insert id="insertTodo" parameterType="kr.or.ddit.vo.main.TodoWidgetVO" useGeneratedKeys="true">
+		<selectKey keyProperty="todoNo" resultType="int" order="BEFORE">
+			SELECT seq_todo.nextval FROM dual
+		</selectKey>
+		INSERT INTO todo(
+			todo_no, emp_no, todo_cn, todo_check_yn, del_yn
+		)VALUES(
+			#{todoNo}, #{empNo}, #{todoCn}, 'N', 'N'
+		)
+	</insert>
+	
+	<select id="getTodoByNo" parameterType="int" resultType="kr.or.ddit.vo.main.TodoWidgetVO">
+		SELECT
+			todo_no, emp_no, todo_cn, todo_check_yn, del_yn 
+		FROM todo
+		where todo_no = #{todoNo}
+	</select>
+	
+	<update id="updateTodoCheck" parameterType="kr.or.ddit.vo.main.TodoWidgetVO">
+		UPDATE todo 
+		SET
+			todo_check_yn = #{todoCheckYn}
+		WHERE
+			todo_no = #{todoNo}
+	</update>
+	
+	<update id="deleteTodo" parameterType="list">
+		UPDATE todo
+		SET del_yn = 'Y'
+		WHERE todo_no IN
+		<foreach collection="list" item="id" open="(" separator="," close=")">
+			#{id}
+		</foreach>
+	</update>
+	
+	<select id="getProjectWidget" parameterType="string" resultType="kr.or.ddit.vo.main.ProjectWidgetVO">
+		SELECT 
+		   p.prjct_no, 
+		   TO_CHAR(TO_DATE(prjct_start_ymd), 'YYYY-MM-DD') as prjct_start_ymd, 
+    	   TO_CHAR(TO_DATE(prjct_ddln_ymd), 'YYYY-MM-DD') as prjct_ddln_ymd, 
+		   spt_nm, spt_addr
+		FROM prjct p
+		INNER JOIN prjct_prtcpnt pr on (p.prjct_no = pr.prjct_no)
+		WHERE prjct_sttus = '17002'
+		AND pr.emp_no = #{empNo}
+	</select>
+	
+	<select id="getTaskWidget" parameterType="string" resultType="kr.or.ddit.vo.main.TaskWidgetVO">
+		SELECT
+		    task_no, task_title, task_cn,
+    		TO_CHAR(TO_DATE(task_begin_ymd), 'YYYY-MM-DD') as task_begin_ymd, 
+    		TO_CHAR(TO_DATE(task_ddln_ymd), 'YYYY-MM-DD') as task_ddln_ymd, 
+		    task_progrs, emrgncy_yn, 
+		    cmmn_cd_nm as procs_ty
+		FROM task t
+		INNER JOIN cmmn_cd cmd ON (cmd.cmmn_cd_id = t.procs_ty)
+		WHERE task_charger = #{empNo}
+		AND task_sttus = '18002'
+		AND del_yn = 'N'
+	</select>
+	
+	<select id="getWidgetByType" parameterType="string" resultType="kr.or.ddit.vo.main.WidgetVO">
+		SELECT
+			grid_master_no, widget_ty, widget_nm, widget_dc, default_width, default_height
+		FROM grid_master
+		WHERE widget_ty = #{type}
+	</select>
+	
+	<delete id="deleteAllWidget" parameterType="string">
+		DELETE FROM user_layout
+		WHERE emp_no = #{empNo}
+	</delete>
+	
+	<insert id="insertWidgets" parameterType="kr.or.ddit.vo.main.WidgetVO">
+		INSERT INTO user_layout(
+			LAYOUT_NO, GRID_MASTER_NO, EMP_NO, GRID_X, GRID_Y
+		) VALUES(
+			seq_layout.nextval, #{gridMasterNo}, #{empNo}, #{gridX}, #{gridY}
+		)
+	</insert>
+</mapper>

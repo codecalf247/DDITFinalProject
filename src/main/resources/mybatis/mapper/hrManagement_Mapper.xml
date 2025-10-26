@@ -1,0 +1,259 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.or.ddit.manager.hrManagement.mapper.IHrManagementMapper">
+
+	<sql id="Search">
+		<if test="searchWord != null ">
+			and (emp_nm like '%'||#{searchWord}||'%')
+		</if>
+		<if test="searchType != null">
+			<if test="searchType == 'active'">
+				AND enabled =1
+			</if>
+			<if test="searchType == 'resigned'">
+				AND enabled =0
+			</if>
+		</if>
+	</sql>
+
+	<resultMap type="kr.or.ddit.vo.EmpVO" id="empMap">
+		<id property="empNo" column="emp_no"/>
+		<result property="empNo" column="emp_no"/>
+		<result property="password" column="PASSWORD"/>
+		<result property="jbgdCd" column="JBGD_CD"/>
+		<result property="empNm" column="EMP_NM"/>
+		<result property="brdt" column="BRDT"/>
+		<result property="email" column="EMAIL"/>
+		<result property="wnmpyEmail" column="WNMPY_EMAIL"/>
+		<result property="telno" column="TELNO"/>
+		<result property="extNo" column="EXT_NO"/>
+		<result property="empZip" column="EMP_ZIP"/>
+		<result property="homeAddr" column="HOME_ADDR"/>
+		<result property="homeDaddr" column="HOME_DADDR"/>
+		<result property="jncmpYmd" column="JNCMP_YMD"/>
+		<result property="rsgntnYmd" column="RSGNTN_YMD"/>
+		<result property="bankCd" column="BANK_CD"/>
+		<result property="actno" column="ACTNO"/>
+		<result property="dpstrNm" column="DPSTR_NM"/>
+		<result property="salary" column="SALARY"/>
+		<result property="profileFilePath" column="PROFILE_FILE_PATH"/>
+		<result property="signFilePath" column="SIGN_FILE_PATH"/>
+		<result property="userFolderUsgqty" column="USER_FOLDER_USGQTY"/>
+		<result property="photoKey" column="PHOTO_KEY"/>
+		<result property="enabled" column="ENABLED"/>
+		<result property="upperDeptNo" column="upper_dept_no"/>
+		<result property="workTyNo" column="work_ty_no"/>
+		<result property="deptNm" column="dept_nm"/>
+		<result property="deptNo" column="dept_no"/>
+		<collection property="authList" resultMap="authMap" />
+		<collection property="deptList" resultMap="deptmap"></collection>
+	</resultMap>
+	
+	<resultMap type="kr.or.ddit.vo.EmpAuthVO" id="authMap">
+		<result property="empNo" column="emp_no"/>
+		<result property="authNm" column="auth_nm"/>
+	</resultMap>
+	
+	<resultMap type="kr.or.ddit.vo.DeptVO" id="deptmap">
+		<result property="deptNo" column="DEPT_NO"/>
+		<result property="upperDeptNo" column="UPPER_DEPT_NO"/>
+		<result property="workTyNo" column="WORK_TY_NO"/>
+		<result property="deptNm" column="DEPT_NM"/>
+		<result property="deptCrtYmd" column="DEPT_CRT_YMD"/>
+	</resultMap>
+
+	<select id="selectEmpNo" parameterType="string">
+		SELECT count(*)
+			FROM EMP
+		WHERE SUBSTR(TO_CHAR(emp_no), 1, 6) = TO_CHAR(SYSDATE, 'YYYYMM')
+	
+	</select>
+
+	<select id="selectDeptNm" resultType="kr.or.ddit.vo.DeptVO">
+		select * from dept
+        where upper_dept_no is not null
+	</select>
+
+	<insert id="insertEmp" parameterType="kr.or.ddit.vo.EmpVO">
+		insert into emp
+		(EMP_NO,
+		DEPT_NO,
+		PASSWORD,
+		JBGD_CD,
+		EMP_NM,
+		BRDT,
+		EMAIL,
+		WNMPY_EMAIL,
+		TELNO,
+		EXT_NO,
+		EMP_ZIP,
+		HOME_ADDR,
+		HOME_DADDR,
+		JNCMP_YMD,
+		RSGNTN_YMD,
+		BANK_CD,
+		ACTNO,
+		DPSTR_NM,
+		SALARY,
+		PROFILE_FILE_PATH,
+		SIGN_FILE_PATH,
+		USER_FOLDER_USGQTY,
+		PHOTO_KEY,
+		ENABLED
+		)
+		values
+		(
+		#{empNo},
+		#{deptNo},
+		#{password},
+		#{jbgdCd},
+		#{empNm},
+		#{brdt},
+		#{email},
+		#{wnmpyEmail},
+		#{telno},
+		'1234', /* 내선번호  */ 
+		#{empZip},
+		#{homeAddr},
+		#{homeDaddr},
+		#{jncmpYmd},
+		'',
+		#{bankCd},
+		#{actno},
+		#{dpstrNm},
+		#{salary},
+		#{profileFilePath},
+		'',
+		#{userFolderUsgqty},
+		'',
+		1
+		)
+	</insert>
+
+	<insert id="insertAuth" parameterType="kr.or.ddit.vo.EmpAuthVO">
+		insert into auth (emp_no,auth_nm)values(#{empNo},#{authNm})
+	</insert>
+
+<select id="selectEmpCount" parameterType="kr.or.ddit.vo.PaginationInfoVO">
+  select count(*) 
+  from emp ep 
+  inner join auth at on ep.emp_no = at.emp_no 
+  inner join dept dp on ep.dept_no = dp.dept_no
+  where 1=1
+  <include refid="Search"></include>
+</select>
+
+<select id="selectAllEmp" parameterType="kr.or.ddit.vo.PaginationInfoVO" resultMap="empMap">
+  select b.* from 
+  (
+    select a.*,
+           -- 1차: 직급 내림차순, 2차: 이름 오름차순
+           row_number() over (order by a.emp_nm asc) rnum
+    from (
+      select *
+      from emp ep 
+      inner join auth at on ep.emp_no = at.emp_no 
+      inner join dept dp on ep.dept_no = dp.dept_no
+      where 1=1
+      <include refid="Search"></include>
+      -- 1차: 직급 내림차순, 2차: 이름 오름차순
+      order by jbgd_cd desc, emp_nm asc
+    ) a
+  ) b
+  <![CDATA[
+  where b.rnum >= #{startRow} and b.rnum <= #{endRow}
+  ]]>
+</select>
+
+
+	<select id="selectOne" resultMap="empMap">
+		select 
+            ep.emp_no
+            ,ep.DEPT_NO
+            ,ep.PASSWORD
+            ,ep.JBGD_CD
+            ,ep.EMP_NM
+            ,ep.BRDT
+            ,ep.EMAIL
+            ,ep.WNMPY_EMAIL
+            ,ep.TELNO
+            ,ep.EXT_NO
+            ,ep.EMP_ZIP
+            ,ep.HOME_ADDR
+            ,ep.HOME_DADDR
+            ,ep.JNCMP_YMD
+            ,ep.RSGNTN_YMD
+            ,ep.BANK_CD
+            ,ep.ACTNO
+            ,ep.DPSTR_NM
+            ,ep.SALARY
+            ,ep.PROFILE_FILE_PATH
+            ,ep.SIGN_FILE_PATH
+            ,ep.USER_FOLDER_USGQTY
+            ,ep.PHOTO_KEY
+            ,ep.ENABLED
+			,dp.UPPER_DEPT_NO
+			,dp.WORK_TY_NO
+			,dp.DEPT_NM
+			,dp.DEPT_CRT_YMD
+			,at.auth_Nm 
+			from emp ep
+			inner join dept dp on ep.dept_no = dp.dept_no
+			inner join auth at on ep.emp_no = at.emp_no
+		where ep.emp_no =  #{empNo}
+		and ep.enabled =1
+	</select>
+	
+	<delete id="deleteAuthByEmpNo" parameterType="string">
+		delete from AUTH 
+		where emp_no = #{empNo}
+	</delete>
+	
+	<update id="updateEmp" parameterType="kr.or.ddit.vo.EmpVO">
+  	UPDATE EMP
+	  <set>
+	    <if test="deptNo != null">DEPT_NO = #{deptNo},</if>
+	    <if test="jbgdCd != null and jbgdCd != ''">JBGD_CD = #{jbgdCd},</if>
+	    <if test="empNm != null and empNm != ''">EMP_NM = #{empNm},</if>
+	    <if test="brdt != null and brdt != ''">BRDT = #{brdt},</if>
+	    <if test="email != null and email != ''">EMAIL = #{email},</if>
+	    <if test="wnmpyEmail != null and wnmpyEmail != ''">WNMPY_EMAIL = #{wnmpyEmail},</if>
+	    <if test="telno != null and telno != ''">TELNO = #{telno},</if>
+	    <if test="extNo != null and extNo != ''">EXT_NO = #{extNo},</if>
+	    <if test="empZip != null and empZip != ''">EMP_ZIP = #{empZip},</if>
+	    <if test="homeAddr != null and homeAddr != ''">HOME_ADDR = #{homeAddr},</if>
+	    <if test="homeDaddr != null and homeDaddr != ''">HOME_DADDR = #{homeDaddr},</if>
+	    <if test="jncmpYmd != null and jncmpYmd != ''">JNCMP_YMD = #{jncmpYmd},</if>
+	    <if test="rsgntnYmd != null and rsgntnYmd != ''">RSGNTN_YMD = #{rsgntnYmd},</if>
+	    <if test="bankCd != null and bankCd != ''">BANK_CD = #{bankCd},</if>
+	    <if test="actno != null and actno != ''">ACTNO = #{actno},</if>
+	    <if test="dpstrNm != null and dpstrNm != ''">DPSTR_NM = #{dpstrNm},</if>
+	    <if test="salary != null">SALARY = #{salary},</if>
+	    <if test="profileFilePath != null and profileFilePath != ''">PROFILE_FILE_PATH = #{profileFilePath},</if>
+	    <if test="signFilePath != null and signFilePath != ''">SIGN_FILE_PATH = #{signFilePath},</if>
+	    <if test="userFolderUsgqty != null">USER_FOLDER_USGQTY = #{userFolderUsgqty},</if>
+	    <if test="photoKey != null and photoKey != ''">PHOTO_KEY = #{photoKey},</if>
+	    <if test="enabled != null">ENABLED = 1,</if>
+	    <if test="password != null and password != ''">PASSWORD = #{password},</if>
+	  </set>
+  	WHERE EMP_NO = #{empNo}
+</update>
+	
+	<update id="deleteEmp" parameterType="kr.or.ddit.vo.EmpVO">
+		update emp
+		   set 
+		   		enabled = 0
+		   		,RSGNTN_YMD = #{rsgntnYmd}
+		 where emp_no = #{empNo}
+	
+	</update>
+	
+	<update id="reactivate" parameterType="kr.or.ddit.vo.EmpVO">
+		update emp
+			set
+				enabled = 1
+				,RSGNTN_YMD = null
+		where emp_no = #{empNo}
+	</update>
+	
+</mapper>

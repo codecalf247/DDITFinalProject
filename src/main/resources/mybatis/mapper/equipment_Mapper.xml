@@ -1,0 +1,124 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.or.ddit.employee.facilities.mapper.IEquipMentMapper">
+
+  <!-- 장비 총 개수 -->
+  <select id="selectEquipCount" parameterType="kr.or.ddit.vo.PaginationInfoVO" resultType="int">
+    SELECT COUNT(e.eqpmn_no)
+    FROM eqpmn e
+    <include refid="searchEqpmn"/>
+  </select>
+
+  <!-- 장비 목록 (등록일 + PK 내림차순, 페이징) -->
+  <select id="selectEquipList" parameterType="kr.or.ddit.vo.PaginationInfoVO" resultType="kr.or.ddit.vo.EqpmnVO">
+    SELECT b.*
+      FROM (
+        SELECT a.*, ROW_NUMBER() OVER (ORDER BY a.eqpmnRegYmd DESC, a.eqpmnNo DESC) rnum
+          FROM (
+            SELECT
+              e.eqpmn_no                                                AS eqpmnNo,
+              e.eqpmn_nm                                                AS eqpmnNm,
+              e.file_group_no                                           AS fileGroupNo,
+              (SELECT file_path
+                 FROM files f
+                WHERE f.file_group_no = e.file_group_no
+                  AND f.del_yn = 'N')                                   AS filePath,
+              cmd.cmmn_cd_id                                            AS eqpmnSttus,
+              cmd.cmmn_cd_nm                                            AS eqpmnSttusNm,
+              e.eqpmn_dc                                                AS eqpmnDc,
+              TO_CHAR(TO_DATE(e.eqpmn_reg_ymd, 'yyyyMMdd'), 'yyyy-MM-dd') AS eqpmnRegYmd,
+              (SELECT COUNT(*) FROM eqpmn_hist eh2 WHERE eh2.eqpmn_no = e.eqpmn_no) AS eqpmnHistCnt,
+              eh.emp_no                                                 AS empNo,
+              emp.emp_nm                                                AS empNm,
+              TO_CHAR(eh.resve_end_dt, 'YYYY-MM-DD')                    AS resveEndDt
+            FROM eqpmn e
+            INNER JOIN cmmn_cd cmd ON (cmd.cmmn_cd_id = e.eqpmn_sttus)
+            LEFT OUTER JOIN eqpmn_hist eh ON (eh.eqpmn_no = e.eqpmn_no AND eh.rturn_dt IS NULL)
+            LEFT OUTER JOIN emp emp ON (emp.emp_no = eh.emp_no)
+            <include refid="searchEqpmn"/>
+          ) a
+      ) b
+    <![CDATA[
+      WHERE b.rnum >= #{startRow} AND b.rnum <= #{endRow}
+    ]]>
+  </select>
+
+  <!-- 장비 검색 조건 (상태 + 장비명) -->
+  <sql id="searchEqpmn">
+    <where>
+      <if test="statusFilter != null and statusFilter != ''">
+        <choose>
+          <when test="statusFilter == 'normal'">
+            AND e.eqpmn_sttus = '13001'
+          </when>
+          <when test="statusFilter == 'rent'">
+            AND e.eqpmn_sttus = '13002'
+          </when>
+          <when test="statusFilter == 'repair'">
+            AND e.eqpmn_sttus = '13003'
+          </when>
+        </choose>
+      </if>
+
+      <if test="searchWord != null and searchWord != ''">
+        AND e.eqpmn_nm LIKE '%' || #{searchWord} || '%'
+      </if>
+    </where>
+  </sql>
+
+  <!-- 공통코드 조회 -->
+  <select id="selectCommonList" resultType="kr.or.ddit.vo.CommonCodeVO">
+    SELECT cmmn_cd_id, cmmn_cd_nm
+      FROM cmmn_cd
+     WHERE cmmn_cd_group_id = #{groupId}
+     ORDER BY cmmn_cd_id
+  </select>
+
+  <!-- 상태별 장비 수 -->
+  <select id="selectEquipCountByStatus" parameterType="string" resultType="int">
+    SELECT COUNT(e.eqpmn_no)
+      FROM eqpmn e
+     WHERE e.eqpmn_sttus = #{status}
+  </select>
+
+  <!-- 대여 이력 등록 -->
+  <insert id="insertEquipHistory" parameterType="kr.or.ddit.vo.EqpmnVO">
+    <selectKey keyProperty="eqpmnHistNo" resultType="long" order="BEFORE">
+      SELECT SEQ_EQPMN_HIST.NEXTVAL FROM DUAL
+    </selectKey>
+    INSERT INTO EQPMN_HIST
+      ( EQPMN_HIST_NO, EQPMN_NO, EMP_NO, REQST_DT
+      , RESVE_START_DT, RESVE_END_DT, RTURN_DT, SPT_NM, MEMO )
+    VALUES
+      ( #{eqpmnHistNo}, #{eqpmnNo}, #{empNo}, SYSDATE
+      , TO_DATE(#{resveStartDt}, 'YYYY-MM-DD')
+      , TO_DATE(#{resveEndDt},   'YYYY-MM-DD')
+      , NULL, #{sptNm}, #{memo} )
+  </insert>
+
+  <!-- 장비 상태 변경: updateEqpmnStatus(String eqpmnNo, String eqpmnSttus) -->
+  <update id="updateEqpmnStatus">
+    UPDATE EQPMN
+       SET EQPMN_STTUS = #{param2}
+     WHERE EQPMN_NO    = #{param1}
+  </update>
+
+  <!-- 반납 처리(빌린 사람만): updateReturnIfRenter(String eqpmnNo, String empNo, String nowYmd, Object memo) -->
+  <update id="updateReturnIfRenter">
+    UPDATE eqpmn_hist
+       SET rturn_dt = TO_DATE(#{param3}, 'YYYY-MM-DD HH24:MI:SS'),
+           memo     = #{param4}
+     WHERE eqpmn_no = #{param1}
+       AND emp_no   = #{param2}
+       AND rturn_dt IS NULL
+  </update>
+
+  <!-- 현재 미반납 이력 수: countCurrentRent(String eqpmnNo) -->
+  <select id="countCurrentRent" parameterType="string" resultType="int">
+    SELECT COUNT(*)
+      FROM eqpmn_hist
+     WHERE eqpmn_no = #{param1}
+       AND rturn_dt IS NULL
+  </select>
+
+</mapper>

@@ -1,0 +1,1035 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.or.ddit.employee.mail.mapper.IMailMapper">
+
+<resultMap type="kr.or.ddit.vo.EmailTrashVO" id="emailTrashMap">
+	<result property="boxNo" column="box_no" />
+	<result property="emailNo" column="email_no" />
+	<result property="empNm" column="emp_nm" />
+	<result property="wrterEmpNo" column="wrter_emp_no" />
+	<result property="emailWrtDt" column="email_wrt_dt" />
+	<result property="emailTitle" column="email_title" />
+	<result property="emailCn" column="email_cn" />
+	<result property="type" column="type" />
+	<collection property="fileList" resultMap="filesMap" />
+</resultMap>
+
+<resultMap type="kr.or.ddit.vo.FilesVO" id="filesMap">
+	<result property="fileGroupNo" column="file_group_no" />
+	<result property="fileNo" column="file_no" />
+	<result property="originalNm" column="original_nm" />
+	<result property="fileUploader" column="file_uploader" />
+	<result property="savedNm" column="saved_nm" />
+	<result property="filePath" column="file_path" />
+	<result property="fileSize" column="file_size" />
+	<result property="fileFancysize" column="file_fancysize" />
+	<result property="fileMime" column="file_mime" />
+	<result property="fileRegDt" column="file_reg_dt" />
+	<result property="delYn" column="del_yn" />
+</resultMap>
+
+<!-- 초안 단건 + 첨부 컬렉션 매핑 -->
+<resultMap id="draftWithFilesMap" type="kr.or.ddit.vo.SendEmailBoxVO">
+  <id     property="emailNo"        column="email_no"/>
+  <result property="wrterEmpNo"      column="wrter_emp_no"/>
+  <result property="emailTitle"      column="email_title"/>
+  <result property="emailCn"         column="email_cn"/>
+  <result property="emailWrtDt"      column="email_wrt_dt"/>
+  <result property="resveDsptchDt"   column="resve_dsptch_dt"/>
+  <result property="tempSaveYn"      column="temp_save_yn"/>
+  <result property="fileGroupNo"     column="file_group_no"/>
+  <result property="senderEmpNm"     column="sender_emp_nm"/>
+  <collection property="fileList" resultMap="filesMap"/>
+</resultMap>
+
+<resultMap type="kr.or.ddit.vo.SendEmailBoxVO" id="sendEmailBoxMap">
+	<result property="emailNo" column="email_no" />
+	<result property="wrterEmpNo" column="wrter_emp_no" />
+	<result property="emailTitle" column="email_title" />
+	<result property="emailCn" column="email_cn" />
+	<result property="emailWrtDt" column="email_wrt_dt" />
+	<result property="resveDsptchDt" column="resve_dsptch_dt" />
+	<result property="tempSaveYn" column="temp_save_yn" />
+	<result property="fileGroupNo" column="file_group_no" />
+	<result property="senderEmpNm" column="sender_emp_nm" />
+	<result property="recptnDt" column="recptn_dt" />
+	<result property="readngDt" column="readng_dt" />
+	<result property="delYn" column="delYn" />
+	<collection property="fileList" resultMap="filesMap" />
+</resultMap>
+
+<!-- 1) getEmpInfo -->
+<select id="getEmpInfo" parameterType="string" resultType="kr.or.ddit.vo.EmpVO">
+    SELECT e.emp_nm,  d.dept_nm, cmd.cmmn_cd_nm AS jbgd_nm
+    FROM emp e
+    INNER JOIN dept d   ON d.dept_no = e.dept_no
+    INNER JOIN cmmn_cd cmd ON cmd.cmmn_cd_id = e.jbgd_cd
+    WHERE e.emp_no = #{param1}
+</select>
+
+<select id="generateFileGroupNo" resultType="int">
+	SELECT SEQ_FILE_GROUP.NEXTVAL FROM dual
+</select>
+
+<insert id="insertFile" parameterType="kr.or.ddit.vo.FilesVO">
+	INSERT INTO files (
+		file_no, file_group_no, original_nm, saved_nm, file_size, file_path,
+		file_uploader,
+		file_fancysize, file_mime, file_reg_dt, del_yn
+	) VALUES (
+		SEQ_FILE.NEXTVAL, #{fileGroupNo}, #{originalNm}, #{savedNm}, #{fileSize}, #{filePath},
+		#{fileUploader},
+		#{fileFancysize}, #{fileMime}, SYSDATE, 'N'
+	)
+</insert>
+
+<!-- 받은 메일함(Inbox) 목록 -->
+<select id="getInboxList" parameterType="string" resultType="kr.or.ddit.vo.SendEmailBoxVO">
+  SELECT a.*,
+         emp.emp_nm AS sender_emp_nm,
+         TO_CHAR(de.dsptch_dt, 'YYYY-MM-DD') AS dsptch_dt
+  FROM (
+    SELECT 
+      e.email_no, e.wrter_emp_no, e.email_title, e.email_cn,
+      e.email_wrt_dt, e.resve_dsptch_dt, e.temp_save_yn, e.file_group_no,
+      er.email_rcver_no
+    FROM email e
+    INNER JOIN email_rcver er ON er.email_no = e.email_no
+    WHERE er.rcver_emp_no = #{param1}
+  ) a
+  INNER JOIN emp emp               ON emp.emp_no = a.wrter_emp_no
+  INNER JOIN recptn_emailbox re    ON re.email_rcver_no = a.email_rcver_no AND re.del_yn = 'N'
+  INNER JOIN dsptch_emailbox de    ON de.email_no = a.email_no
+</select>
+
+<select id="selectInboxCount" parameterType="kr.or.ddit.vo.PaginationInfoVO" resultType="int">
+  SELECT COUNT(1)
+  FROM email e
+  INNER JOIN email_rcver r     ON r.email_no        = e.email_no
+  INNER JOIN emp ep            ON ep.emp_no         = e.wrter_emp_no
+  INNER JOIN recptn_emailbox re ON re.email_rcver_no = r.email_rcver_no
+  WHERE r.rcver_emp_no = #{empNo}
+    AND re.del_yn      = 'N'
+  <include refid="searchmail"/>
+</select>
+
+<select id="selectInboxList" parameterType="kr.or.ddit.vo.PaginationInfoVO"
+        resultType="kr.or.ddit.vo.SendEmailBoxVO">
+  SELECT b.*
+  FROM (
+    SELECT a.*,
+           ROW_NUMBER() OVER (ORDER BY re.recptn_dt DESC) AS rnum,
+           TO_CHAR(re.recptn_dt, 'YYYY-MM-DD')           AS recptn_dt,
+           TO_CHAR(re.readng_dt,'YYYY-MM-DD HH24:MI:SS') AS readng_dt,
+           re.recptn_emailbox_no
+    FROM (
+      SELECT
+        e.email_no, e.wrter_emp_no, e.email_title, e.email_cn,
+        e.email_wrt_dt, e.resve_dsptch_dt, e.temp_save_yn, e.file_group_no,
+        r.email_rcver_no AS email_rcver_no,
+        r.rcver_emp_no,
+        ep.emp_nm AS sender_emp_nm
+      FROM email e
+      INNER JOIN email_rcver r ON e.email_no = r.email_no
+      INNER JOIN emp ep        ON e.wrter_emp_no = ep.emp_no
+      WHERE r.rcver_emp_no = #{empNo}
+      <include refid="searchmail"/>
+    ) a
+    INNER JOIN recptn_emailbox re
+      ON re.email_rcver_no = a.email_rcver_no
+     AND re.del_yn         = 'N'
+  ) b
+  <![CDATA[
+    WHERE b.rnum >= #{startRow} AND b.rnum <= #{endRow}
+  ]]>
+  ORDER BY b.rnum
+</select>
+
+<sql id="searchmail">
+  <if test="searchType != null and searchType != '' and searchWord != null and searchWord != ''">
+    <choose>
+      <when test="searchType == 'all'">
+        AND (
+             ep.emp_nm     LIKE '%' || #{searchWord} || '%'
+          OR e.email_title LIKE '%' || #{searchWord} || '%'
+        )
+      </when>
+      <when test="searchType == 'empNm'">
+        AND ep.emp_nm     LIKE '%' || #{searchWord} || '%'
+      </when>
+      <when test="searchType == 'emailTitle'">
+        AND e.email_title LIKE '%' || #{searchWord} || '%'
+      </when>
+    </choose>
+  </if>
+</sql>
+
+<select id="getInboxDetail" parameterType="long" resultMap="sendEmailBoxMap">
+  SELECT
+    re.recptn_emailbox_no,
+    re.email_rcver_no,
+    TO_CHAR(re.recptn_dt,'YYYY-MM-DD HH24:MI:SS') AS recptn_dt,
+    TO_CHAR(re.readng_dt,'YYYY-MM-DD HH24:MI:SS') AS readng_dt,
+    re.del_yn,
+    e.email_no, e.wrter_emp_no, e.email_title, e.email_cn,
+    TO_CHAR(e.email_wrt_dt,'YYYY-MM-DD HH24:MI:SS') AS email_wrt_dt,
+    e.resve_dsptch_dt, e.temp_save_yn,  e.file_group_no, ep.emp_nm AS sender_emp_nm,
+    f.FILE_NO, f.ORIGINAL_NM, f.FILE_UPLOADER, f.SAVED_NM, f.FILE_PATH, f.FILE_SIZE, f.FILE_FANCYSIZE, f.FILE_MIME, f.FILE_REG_DT, f.DEL_YN
+  FROM recptn_emailbox re
+  JOIN email_rcver er ON re.email_rcver_no = er.email_rcver_no
+  JOIN email e        ON er.email_no       = e.email_no
+  JOIN emp   ep       ON e.wrter_emp_no    = ep.emp_no
+  LEFT OUTER JOIN FILES f on (f.file_group_no = e.file_group_no and f.del_yn = 'N')
+  WHERE re.recptn_emailbox_no = #{param1}
+    AND re.del_yn = 'N'
+</select>
+
+<update id="markInboxAsRead" parameterType="long">
+  UPDATE recptn_emailbox
+     SET readng_dt = SYSTIMESTAMP
+   WHERE recptn_emailbox_no = #{param1}
+     AND del_yn    = 'N'
+     AND readng_dt IS NULL
+</update>
+
+<update id="markInboxListAsRead">
+  UPDATE recptn_emailbox re
+     SET readng_dt = SYSTIMESTAMP
+   WHERE re.recptn_emailbox_no IN
+   <foreach collection="param2" item="id" open="(" separator="," close=")">
+     #{id}
+   </foreach>
+     AND re.del_yn     = 'N'
+     AND re.readng_dt IS NULL
+     AND EXISTS (
+       SELECT 1
+         FROM email_rcver er
+        WHERE er.email_rcver_no = re.email_rcver_no
+          AND er.rcver_emp_no   = #{param1}
+     )
+</update>
+
+<update id="markInboxListAsDeleted">
+  UPDATE recptn_emailbox re
+     SET del_yn = 'Y'
+   WHERE re.recptn_emailbox_no IN
+   <foreach collection="param2" item="id" open="(" separator="," close=")">
+     #{id}
+   </foreach>
+     AND re.del_yn = 'N'
+     AND EXISTS (
+       SELECT 1
+         FROM email_rcver er
+        WHERE er.email_rcver_no = re.email_rcver_no
+          AND er.rcver_emp_no   = #{param1}
+     )
+</update>
+
+<!-- 휴지통: 총건수 -->
+<select id="selectTrashCount" parameterType="kr.or.ddit.vo.PaginationInfoVO" resultType="int">
+  SELECT COUNT(*)
+  FROM (
+    SELECT recptn_emailbox_no as box_no, 
+           e.email_no,
+           ep.emp_nm,
+           wrter_emp_no, 
+           email_wrt_dt, 
+           email_title, 
+           email_cn, 
+           1 as type
+      FROM RECPTN_EMAILBOX re
+      INNER JOIN EMAIL_RCVER er on (re.email_rcver_no = er.email_rcver_no)
+      INNER JOIN EMAIL e on (e.email_no = re.email_no)
+      INNER JOIN EMP ep on (e.wrter_emp_no = ep.emp_no)
+     WHERE DEL_YN = 'Y'
+       AND er.rcver_emp_no = #{empNo}
+     <include refid="searchmail"/>
+    union all
+    SELECT dsptch_emailbox_no as box_no, 
+           e.email_no,
+           ep.emp_nm,
+           wrter_emp_no, 
+           email_wrt_dt, 
+           email_title, 
+           email_cn, 
+           2 as type
+      FROM DSPTCH_EMAILBOX de
+      INNER JOIN EMAIL e on (de.email_no = e.email_no)
+      INNER JOIN EMP ep on (e.wrter_emp_no = ep.emp_no)
+     WHERE DEL_YN = 'Y'
+       AND DSPTCH_EMP_NO = #{empNo}
+     <include refid="searchmail"/>
+    union all
+    SELECT refrn_emailbox_no as box_no, 
+           e.email_no,
+           ep.emp_nm,
+           wrter_emp_no, 
+           email_wrt_dt, 
+           email_title, 
+           email_cn, 
+           3 as type
+      FROM REFRN_EMAILBOX re
+      INNER JOIN EMAIL e on (re.email_no = e.email_no) 
+      INNER JOIN EMAIL_CC cc on (re.email_cc_no = cc.email_cc_no)
+      INNER JOIN EMP ep on (e.wrter_emp_no = ep.emp_no)
+     WHERE DEL_YN = 'Y'
+       AND cc.cc_emp_no = #{empNo}
+     <include refid="searchmail"/>
+  )
+</select>
+
+<!-- 휴지통: 목록 -->
+<select id="selectTrashList" parameterType="kr.or.ddit.vo.PaginationInfoVO"
+        resultType="kr.or.ddit.vo.EmailTrashVO">
+  SELECT b.*
+  FROM (
+    SELECT a.*,
+           ROW_NUMBER() OVER (ORDER BY email_wrt_dt DESC) AS rnum
+      FROM (
+        SELECT recptn_emailbox_no as box_no, 
+               e.email_no,
+               ep.emp_nm,
+               wrter_emp_no, 
+               email_wrt_dt, 
+               email_title, 
+               email_cn, 
+               1 as type
+          FROM RECPTN_EMAILBOX re
+          INNER JOIN EMAIL_RCVER er on (re.email_rcver_no = er.email_rcver_no)
+          INNER JOIN EMAIL e on (e.email_no = re.email_no)
+          INNER JOIN EMP ep on (e.wrter_emp_no = ep.emp_no)
+         WHERE DEL_YN = 'Y'
+           AND er.rcver_emp_no = #{empNo}
+         <include refid="searchmail"/>
+        union all
+        SELECT dsptch_emailbox_no as box_no, 
+               e.email_no,
+               ep.emp_nm,
+               wrter_emp_no, 
+               email_wrt_dt, 
+               email_title, 
+               email_cn, 
+               2 as type
+          FROM DSPTCH_EMAILBOX de
+          INNER JOIN EMAIL e on (de.email_no = e.email_no)
+          INNER JOIN EMP ep on (e.wrter_emp_no = ep.emp_no)
+         WHERE DEL_YN = 'Y'
+           AND DSPTCH_EMP_NO = #{empNo}
+         <include refid="searchmail"/>
+        union all
+        SELECT refrn_emailbox_no as box_no, 
+               e.email_no,
+               ep.emp_nm,
+               wrter_emp_no, 
+               email_wrt_dt, 
+               email_title, 
+               email_cn, 
+               3 as type
+          FROM REFRN_EMAILBOX re
+          INNER JOIN EMAIL e on (re.email_no = e.email_no) 
+          INNER JOIN EMAIL_CC cc on (re.email_cc_no = cc.email_cc_no)
+          INNER JOIN EMP ep on (e.wrter_emp_no = ep.emp_no)
+         WHERE DEL_YN = 'Y'
+           AND cc.cc_emp_no = #{empNo}
+         <include refid="searchmail"/>
+      ) a
+  ) b
+  <![CDATA[
+    WHERE b.rnum >= #{startRow} AND b.rnum <= #{endRow}
+  ]]>
+  ORDER BY b.rnum
+</select>
+
+<!-- 휴지통: 상세 (empNo, recptnEmailboxNo) -->
+<select id="getTrashDetail" parameterType="map" resultMap="emailTrashMap">
+  SELECT
+    re.recptn_emailbox_no AS box_no,
+    e.email_no, e.wrter_emp_no, e.email_title, e.email_cn,
+    TO_CHAR(e.email_wrt_dt,'YYYY-MM-DD HH24:MI:SS') AS email_wrt_dt,
+    e.resve_dsptch_dt,  e.temp_save_yn,  e.file_group_no,
+    ep.emp_nm AS emp_nm,
+    f.file_no, f.original_nm, f.file_uploader, f.saved_nm, f.file_path, f.file_size, f.file_fancysize, f.file_mime, f.file_reg_dt, f.del_yn,
+    1 as type
+  FROM recptn_emailbox re
+  JOIN email_rcver er ON er.email_rcver_no = re.email_rcver_no
+  JOIN email e        ON e.email_no        = er.email_no
+  JOIN emp   ep       ON ep.emp_no         = e.wrter_emp_no
+  LEFT OUTER JOIN FILES f ON (f.file_group_no = e.file_group_no AND f.del_yn = 'N')
+  WHERE re.recptn_emailbox_no = #{param2}
+    AND re.del_yn = 'Y'
+    AND er.rcver_emp_no = #{param1}
+</select>
+
+<!-- 휴지통: 선택 항목 복구 -->
+<update id="restoreTrash">
+  UPDATE recptn_emailbox re
+     SET re.del_yn = 'N'
+   WHERE re.recptn_emailbox_no IN
+   <foreach collection="param2" item="id" open="(" separator="," close=")">
+     #{id}
+   </foreach>
+     AND re.del_yn = 'Y'
+     AND EXISTS (
+       SELECT 1
+         FROM email_rcver er
+        WHERE er.email_rcver_no = re.email_rcver_no
+          AND er.rcver_emp_no   = #{param1}  
+     )
+</update>
+
+<!-- *** 기존 eraseTrash 삭제하고, 아래 3개로 교체 *** -->
+
+<!-- 받은메일함: 영구삭제 -->
+<delete id="eraseTrashReceives">
+  DELETE FROM recptn_emailbox re
+   WHERE re.recptn_emailbox_no IN
+   <foreach collection="param2" item="id" open="(" separator="," close=")">
+     #{id}
+   </foreach>
+     AND re.del_yn = 'Y'
+     AND EXISTS (
+       SELECT 1
+         FROM email_rcver er
+        WHERE er.email_rcver_no = re.email_rcver_no
+          AND er.rcver_emp_no   = #{param1}
+     )
+</delete>
+
+<!-- 보낸메일함: 영구삭제 -->
+<delete id="eraseTrashSents">
+  DELETE FROM dsptch_emailbox d
+   WHERE d.dsptch_emailbox_no IN
+   <foreach collection="param2" item="id" open="(" separator="," close=")">
+     #{id}
+   </foreach>
+     AND d.del_yn = 'Y'
+     AND EXISTS (
+       SELECT 1
+         FROM email e
+        WHERE e.email_no     = d.email_no
+          AND e.wrter_emp_no = #{param1}
+     )
+</delete>
+
+<!-- 참조메일함: 영구삭제 -->
+<delete id="eraseTrashRefs">
+  DELETE FROM refrn_emailbox r
+   WHERE r.refrn_emailbox_no IN
+   <foreach collection="param2" item="id" open="(" separator="," close=")">
+     #{id}
+   </foreach>
+     AND r.del_yn = 'Y'
+     AND EXISTS (
+       SELECT 1
+         FROM email_cc cc
+        WHERE cc.email_cc_no = r.email_cc_no
+          AND cc.cc_emp_no   = #{param1}
+     )
+</delete>
+
+<select id="getTrashInboxDetail" parameterType="long" resultMap="emailTrashMap">
+  SELECT a.*, emp.emp_nm
+    FROM (SELECT 
+            EMAIL_NO, WRTER_EMP_NO, EMAIL_TITLE, EMAIL_CN, EMAIL_WRT_DT, RESVE_DSPTCH_DT, TEMP_SAVE_YN, E.FILE_GROUP_NO,
+            FILE_NO, ORIGINAL_NM, FILE_UPLOADER, SAVED_NM, FILE_PATH, FILE_SIZE, FILE_FANCYSIZE, FILE_MIME, FILE_REG_DT, DEL_YN
+          FROM EMAIL e
+          LEFT OUTER JOIN FILES f on (f.file_group_no = e.file_group_no)
+         WHERE EMAIL_NO = #{emailNo}) a
+    INNER JOIN EMP emp on(emp.emp_no = a.WRTER_EMP_NO)
+</select>
+
+<update id="restoreSendEmail" parameterType="int">
+  UPDATE DSPTCH_EMAILBOX
+     SET del_yn = 'N'
+   WHERE DSPTCH_EMAILBOX_NO = #{boxNo}
+</update>
+
+<update id="restoreReceiveEmail" parameterType="int">
+  UPDATE RECPTN_EMAILBOX
+     SET del_yn = 'N'
+   WHERE RECPTN_EMAILBOX_NO = #{boxNo}
+</update>
+
+<update id="restoreReferenceEmail" parameterType="int">
+  UPDATE REFRN_EMAILBOX
+     SET del_yn = 'N'
+   WHERE REFRN_EMAILBOX_NO = #{boxNo}
+</update>
+
+<!-- 사내 주소록 -->
+<select id="selectAddressbookEmployees" resultType="kr.or.ddit.vo.EmpVO">
+  SELECT *
+  FROM (
+    SELECT
+      e.emp_no      AS empNo,
+      e.emp_nm      AS empNm,
+      d.dept_nm     AS deptNm,
+      e.wnmpy_email AS email
+    FROM emp e
+    INNER JOIN dept d ON d.dept_no = e.dept_no
+    WHERE 1 = 1
+      AND e.enabled = 1
+      <if test="param1 != null and param1 != ''">
+        AND (
+             LOWER(e.emp_nm)      LIKE '%' || LOWER(#{param1}) || '%'
+          OR LOWER(d.dept_nm)     LIKE '%' || LOWER(#{param1}) || '%'
+          OR LOWER(e.wnmpy_email) LIKE '%' || LOWER(#{param1}) || '%'
+        )
+      </if>
+    ORDER BY e.emp_nm, d.dept_nm
+  )
+  WHERE ROWNUM &lt;= #{param2}
+</select>
+
+<insert id="insertEmail" parameterType="kr.or.ddit.vo.SendEmailBoxVO">
+  <selectKey keyProperty="emailNo" order="BEFORE" resultType="long">
+    SELECT SEQ_EMAIL.NEXTVAL FROM DUAL
+  </selectKey>
+  INSERT INTO EMAIL(
+      email_no, wrter_emp_no, email_title,
+      email_cn, email_wrt_dt, resve_dsptch_dt,
+      temp_save_yn, file_group_no
+  )
+  VALUES(
+      #{emailNo}, #{wrterEmpNo}, #{emailTitle},
+      #{emailCn}, SYSDATE,
+      <choose>
+        <when test="resveDsptchDt != null and resveDsptchDt != ''">
+          TO_DATE(#{resveDsptchDt}, 'YYYY-MM-DD HH24:MI:SS')
+        </when>
+        <otherwise>NULL</otherwise>
+      </choose>,
+      'N', #{fileGroupNo}
+  )
+</insert>
+
+<insert id="insertDsptch" parameterType="kr.or.ddit.vo.SendEmailBoxVO">
+  INSERT INTO DSPTCH_EMAILBOX (
+      DSPTCH_EMAILBOX_NO, EMAIL_NO, DSPTCH_EMP_NO, DSPTCH_DT, DEL_YN
+  ) VALUES (
+      SEQ_DSPTCH_EMAILBOX.NEXTVAL, #{emailNo}, #{wrterEmpNo}, SYSDATE, 'N'
+  )
+</insert>
+
+<insert id="insertEmailRcver" parameterType="kr.or.ddit.vo.SendEmailBoxVO">
+  INSERT INTO EMAIL_RCVER (email_rcver_no, email_no, rcver_emp_no)
+  SELECT SEQ_EMAIL_RCVER.NEXTVAL, #{param2}, emp_no
+    FROM EMP
+   WHERE LOWER(WNMPY_EMAIL) = LOWER(#{param1})
+</insert>
+
+<select id="selectToEmailList" parameterType="long" resultType="long">
+  SELECT EMAIL_RCVER_NO
+    FROM EMAIL_RCVER	
+   WHERE EMAIL_NO = #{param1}
+</select>
+
+<insert id="insertRecptn">
+  INSERT INTO RECPTN_EMAILBOX (
+      RECPTN_EMAILBOX_NO, EMAIL_NO, EMAIL_RCVER_NO, RECPTN_DT, DEL_YN, RECPTN_STATUS
+  ) VALUES (
+      SEQ_RECPTN_EMAILBOX.NEXTVAL, #{param2}, #{param1}, SYSDATE, 'N', 'N'
+  )
+</insert>
+
+<insert id="insertCc">
+  INSERT INTO EMAIL_CC (EMAIL_CC_NO, EMAIL_NO, CC_EMP_NO)
+  SELECT SEQ_EMAIL_CC.NEXTVAL, #{param2}, emp_no
+    FROM EMP 
+   WHERE LOWER(wnmpy_email) = LOWER(#{param1})
+</insert>
+
+<select id="selectCcEmailList" parameterType="long" resultType="long">
+  SELECT EMAIL_CC_NO
+    FROM EMAIL_CC
+   WHERE EMAIL_NO = #{param1}
+</select>
+
+<insert id="insertRefrn">
+  INSERT INTO REFRN_EMAILBOX (
+      REFRN_EMAILBOX_NO, EMAIL_NO, EMAIL_CC_NO, RECPTN_DT, READNG_DT, DEL_YN
+  ) VALUES (
+      SEQ_REFRN_EMAILBOX.NEXTVAL, #{param2}, #{param1}, SYSDATE, null ,'N'
+  )
+</insert>
+
+<select id="selectDueReservedEmailNos" parameterType="int" resultType="long">
+  SELECT e.EMAIL_NO
+    FROM EMAIL e
+   WHERE e.RESVE_DSPTCH_DT IS NOT NULL
+     AND e.TEMP_SAVE_YN = 'N'
+     AND e.RESVE_DSPTCH_DT &lt;= SYSDATE
+     AND NOT EXISTS (SELECT 1 FROM DSPTCH_EMAILBOX d WHERE d.EMAIL_NO = e.EMAIL_NO)
+   ORDER BY e.RESVE_DSPTCH_DT
+   FETCH FIRST #{param1} ROWS ONLY
+</select>
+
+<insert id="insertDsptchByEmailNo" parameterType="long">
+  INSERT INTO DSPTCH_EMAILBOX (
+      DSPTCH_EMAILBOX_NO, EMAIL_NO, DSPTCH_EMP_NO, DSPTCH_DT, DEL_YN
+  )
+  SELECT
+      SEQ_DSPTCH_EMAILBOX.NEXTVAL,
+      e.EMAIL_NO,
+      e.WRTER_EMP_NO,
+      SYSTIMESTAMP,
+      'N'
+    FROM EMAIL e
+   WHERE e.EMAIL_NO = #{param1}
+</insert>
+
+<update id="clearReserveFlag" parameterType="long">
+  UPDATE EMAIL
+     SET RESVE_DSPTCH_DT = NULL
+   WHERE EMAIL_NO = #{param1}
+</update>
+
+<insert id="insertDraftEmail" parameterType="kr.or.ddit.vo.SendEmailBoxVO">
+  <selectKey keyProperty="emailNo" order="BEFORE" resultType="long">
+    SELECT SEQ_EMAIL.NEXTVAL FROM DUAL
+  </selectKey>
+  INSERT INTO EMAIL (
+      EMAIL_NO, WRTER_EMP_NO,  EMAIL_TITLE, EMAIL_CN,  EMAIL_WRT_DT,  RESVE_DSPTCH_DT,
+      TEMP_SAVE_YN, FILE_GROUP_NO
+  ) VALUES (
+      #{emailNo},
+      #{wrterEmpNo},
+      NVL(#{emailTitle}, '제목없음'),   
+      #{emailCn},
+      SYSDATE,
+      NULL,
+      'Y',
+      #{fileGroupNo}
+  )
+</insert>
+
+<select id="selectReserveCount"
+        parameterType="kr.or.ddit.vo.PaginationInfoVO"
+        resultType="int">
+  SELECT COUNT(1)
+    FROM EMAIL e
+    INNER JOIN EMP ep
+            ON ep.emp_no = e.wrter_emp_no
+   WHERE e.wrter_emp_no      = #{empNo}
+     AND e.resve_dsptch_dt  IS NOT NULL
+     AND NOT EXISTS (
+           SELECT 1 FROM DSPTCH_EMAILBOX d
+            WHERE d.email_no = e.email_no
+         )
+   <include refid="searchmail"/>
+</select>
+
+<select id="selectReserveList"
+        parameterType="kr.or.ddit.vo.PaginationInfoVO"
+        resultType="kr.or.ddit.vo.SendEmailBoxVO">
+  SELECT b.*
+    FROM (
+          SELECT
+                 e.email_no,
+                 e.wrter_emp_no,
+                 e.email_title,
+                 e.email_cn,
+                 TO_CHAR(e.email_wrt_dt,    'YYYY-MM-DD HH24:MI:SS') AS email_wrt_dt,
+                 TO_CHAR(e.resve_dsptch_dt, 'YYYY-MM-DD HH24:MI:SS') AS resve_dsptch_dt,
+                 e.temp_save_yn,
+                 e.file_group_no,
+                 ep.emp_nm AS sender_emp_nm,
+
+                 /* ✅ 예약건의 수신자 리스트 */
+                 (
+                   SELECT LISTAGG(emp.emp_nm, ', ') WITHIN GROUP (ORDER BY er.email_rcver_no)
+                   FROM email_rcver er
+                   INNER JOIN emp ON emp.emp_no = er.rcver_emp_no
+                   WHERE er.email_no = e.email_no
+                 ) AS rcver_names,
+
+                 ROW_NUMBER() OVER (ORDER BY e.resve_dsptch_dt ASC, e.email_no DESC) AS rnum
+            FROM EMAIL e
+            INNER JOIN EMP ep
+                    ON ep.emp_no = e.wrter_emp_no
+           WHERE e.wrter_emp_no      = #{empNo}
+             AND e.resve_dsptch_dt  IS NOT NULL
+             AND NOT EXISTS (
+                   SELECT 1 FROM DSPTCH_EMAILBOX d
+                    WHERE d.email_no = e.email_no
+                 )
+           <include refid="searchmail"/>
+         ) b
+ <![CDATA[
+  WHERE b.rnum >= #{startRow} AND b.rnum <= #{endRow}
+ ]]>
+ ORDER BY b.rnum
+</select>
+
+<delete id="deleteReservedEmailReceivers">
+  DELETE FROM EMAIL_RCVER er
+   WHERE er.email_no IN
+   <foreach collection="param2" item="id" open="(" separator="," close=")">
+     #{id}
+   </foreach>
+     AND EXISTS (
+       SELECT 1
+         FROM EMAIL e
+        WHERE e.email_no = er.email_no
+          AND e.wrter_emp_no = #{param1}
+          AND e.resve_dsptch_dt IS NOT NULL
+          AND NOT EXISTS (SELECT 1 FROM DSPTCH_EMAILBOX d WHERE d.email_no = e.email_no)
+     )
+</delete>
+
+<delete id="deleteReservedEmailCcs">
+  DELETE FROM EMAIL_CC cc
+   WHERE cc.email_no IN
+   <foreach collection="param2" item="id" open="(" separator="," close=")">
+     #{id}
+   </foreach>
+     AND EXISTS (
+       SELECT 1
+         FROM EMAIL e
+        WHERE e.email_no = cc.email_no
+          AND e.wrter_emp_no = #{param1}
+          AND e.resve_dsptch_dt IS NOT NULL
+          AND NOT EXISTS (SELECT 1 FROM DSPTCH_EMAILBOX d WHERE d.email_no = e.email_no)
+     )
+</delete>
+
+<delete id="deleteReservedEmails">
+  DELETE FROM EMAIL e
+   WHERE e.email_no IN
+   <foreach collection="param2" item="id" open="(" separator="," close=")">
+     #{id}
+   </foreach>
+     AND e.wrter_emp_no = #{param1}
+     AND e.resve_dsptch_dt IS NOT NULL
+     AND NOT EXISTS (SELECT 1 FROM DSPTCH_EMAILBOX d WHERE d.email_no = e.email_no)
+</delete>
+
+<select id="selectReserveDetail"
+        parameterType="map"
+        resultMap="sendEmailBoxMap">
+  SELECT
+      e.EMAIL_NO, e.WRTER_EMP_NO, e.EMAIL_TITLE, e.EMAIL_CN,
+      TO_CHAR(e.EMAIL_WRT_DT,    'YYYY-MM-DD HH24:MI:SS') AS email_wrt_dt,
+      TO_CHAR(e.RESVE_DSPTCH_DT, 'YYYY-MM-DD HH24:MI:SS') AS resve_dsptch_dt,
+      e.TEMP_SAVE_YN, e.FILE_GROUP_NO, ep.EMP_NM AS sender_emp_nm,
+      f.file_no, f.original_nm, f.file_uploader, f.saved_nm, f.file_path, f.file_size, f.file_fancysize, f.file_mime, f.file_reg_dt, f.del_yn
+  FROM EMAIL e
+  JOIN EMP ep
+    ON ep.EMP_NO = e.WRTER_EMP_NO
+  LEFT OUTER JOIN FILES f
+    ON (f.file_group_no = e.file_group_no AND f.del_yn = 'N')
+  WHERE e.WRTER_EMP_NO = #{param1}
+    AND e.EMAIL_NO = #{param2}
+    AND e.RESVE_DSPTCH_DT IS NOT NULL
+    AND NOT EXISTS (
+          SELECT 1
+            FROM DSPTCH_EMAILBOX d
+           WHERE d.EMAIL_NO = e.EMAIL_NO
+        )
+</select>
+
+<select id="selecttemporaryCount"
+        parameterType="kr.or.ddit.vo.PaginationInfoVO"
+        resultType="int">
+  SELECT COUNT(1)
+    FROM EMAIL e
+    INNER JOIN EMP ep
+            ON ep.emp_no = e.wrter_emp_no
+   WHERE e.wrter_emp_no = #{empNo}
+     AND e.temp_save_yn = 'Y'
+  <include refid="searchmail"/>
+</select>
+
+<select id="selecttemporaryList"
+        parameterType="kr.or.ddit.vo.PaginationInfoVO"
+        resultType="kr.or.ddit.vo.SendEmailBoxVO">
+  SELECT b.*
+    FROM (
+          SELECT
+                 e.email_no,
+                 e.wrter_emp_no,
+                 e.email_title,
+                 e.email_cn,
+                 TO_CHAR(e.email_wrt_dt,    'YYYY-MM-DD HH24:MI:SS') AS email_wrt_dt,
+                 TO_CHAR(e.resve_dsptch_dt, 'YYYY-MM-DD HH24:MI:SS') AS resve_dsptch_dt,
+                 e.temp_save_yn,
+                 e.file_group_no,
+                 ep.emp_nm AS sender_emp_nm,
+                 ROW_NUMBER() OVER (ORDER BY e.email_wrt_dt DESC, e.email_no DESC) AS rnum
+            FROM EMAIL e
+            INNER JOIN EMP ep
+                    ON ep.emp_no = e.wrter_emp_no
+           WHERE e.wrter_emp_no = #{empNo}
+             AND e.temp_save_yn = 'Y'
+           <include refid="searchmail"/>
+         ) b
+  <![CDATA[
+   WHERE b.rnum >= #{startRow} AND b.rnum <= #{endRow}
+  ]]>
+  ORDER BY b.rnum
+</select>
+
+<delete id="eraseDraftEmails">
+  DELETE FROM EMAIL e
+   WHERE e.EMAIL_NO IN
+   <foreach collection="cleaned" item="id" open="(" separator="," close=")">
+     #{id}
+   </foreach>
+     AND e.WRTER_EMP_NO = #{empNo}
+     AND e.TEMP_SAVE_YN = 'Y'
+</delete>
+
+<select id="getDraftEmail" parameterType="long" resultMap="draftWithFilesMap">
+  SELECT a.*, emp.emp_nm as sender_emp_nm
+    FROM (SELECT 
+            EMAIL_NO, WRTER_EMP_NO, EMAIL_TITLE, EMAIL_CN, EMAIL_WRT_DT, RESVE_DSPTCH_DT, TEMP_SAVE_YN, E.FILE_GROUP_NO,
+            FILE_NO, ORIGINAL_NM, FILE_UPLOADER, SAVED_NM, FILE_PATH, FILE_SIZE, FILE_FANCYSIZE, FILE_MIME, FILE_REG_DT, DEL_YN
+          FROM EMAIL e
+          LEFT OUTER JOIN FILES f on (f.file_group_no = e.file_group_no)
+         WHERE EMAIL_NO = #{emailNo}
+    ) a
+    INNER JOIN EMP emp on(emp.emp_no = a.WRTER_EMP_NO)
+</select>
+
+<select id="getToEmail" parameterType="long" resultType="kr.or.ddit.vo.SendEmailBoxVO">
+  SELECT
+      er.email_rcver_no,
+      er.email_no,
+      er.rcver_emp_no      AS rcver_emp_no,
+      e.wnmpy_email        AS rcver_email,
+      e.emp_nm             AS rcver_emp_nm
+  FROM email_rcver er
+  INNER JOIN emp e ON er.rcver_emp_no = e.emp_no
+  WHERE er.email_no = #{param1} 
+</select>
+
+<select id="getCcEmail" parameterType="long" resultType="kr.or.ddit.vo.SendEmailBoxVO">
+  SELECT
+      ec.email_cc_no,
+      ec.email_no,
+      ec.cc_emp_no         AS rcver_emp_no,
+      e.wnmpy_email        AS rcver_email,
+      e.emp_nm             AS rcver_emp_nm
+  FROM email_cc ec
+  INNER JOIN emp e ON ec.cc_emp_no = e.emp_no
+  WHERE ec.email_no = #{param1}
+</select>
+
+<select id="selectRefCount" parameterType="kr.or.ddit.vo.PaginationInfoVO" resultType="int">
+  SELECT COUNT(1)
+    FROM email e
+    INNER JOIN email_cc cc       ON cc.email_no       = e.email_no
+    INNER JOIN emp ep            ON ep.emp_no         = e.wrter_emp_no
+    INNER JOIN refrn_emailbox re ON re.email_cc_no    = cc.email_cc_no
+   WHERE cc.cc_emp_no = #{empNo}
+     AND re.del_yn      = 'N'
+  <include refid="searchmail"/>
+</select>
+
+<select id="selectRefList" parameterType="kr.or.ddit.vo.PaginationInfoVO"
+        resultType="kr.or.ddit.vo.SendEmailBoxVO">
+  SELECT b.*
+  FROM (
+    SELECT a.*,
+           ROW_NUMBER() OVER (ORDER BY re.recptn_dt DESC) AS rnum,
+           TO_CHAR(re.recptn_dt, 'YYYY-MM-DD')           AS recptn_dt,
+           TO_CHAR(re.readng_dt,'YYYY-MM-DD HH24:MI:SS') AS readng_dt,
+           re.refrn_emailbox_no AS recptn_emailbox_no
+    FROM (
+      SELECT
+        e.email_no, e.wrter_emp_no, e.email_title, e.email_cn,
+        e.email_wrt_dt, e.resve_dsptch_dt, e.temp_save_yn, e.file_group_no,
+        cc.email_cc_no AS email_cc_no,
+        cc.cc_emp_no,
+        ep.emp_nm AS sender_emp_nm
+      FROM email e
+      INNER JOIN email_cc cc ON e.email_no = cc.email_no
+      INNER JOIN emp ep        ON e.wrter_emp_no = ep.emp_no
+      WHERE cc.cc_emp_no = #{empNo}
+      <include refid="searchmail"/>
+    ) a
+    INNER JOIN refrn_emailbox re
+      ON re.email_cc_no = a.email_cc_no
+     AND re.del_yn      = 'N'
+  ) b
+  <![CDATA[
+    WHERE b.rnum >= #{startRow} AND b.rnum <= #{endRow}
+  ]]>
+  ORDER BY b.rnum
+</select>
+
+<update id="markRefAsRead" parameterType="long">
+  UPDATE REFRN_EMAILBOX
+     SET readng_dt = SYSTIMESTAMP
+   WHERE REFRN_EMAILBOX_NO = #{param1}
+     AND del_yn    = 'N'
+     AND readng_dt IS NULL
+</update>
+
+<select id="getRefDetail" parameterType="long" resultMap="sendEmailBoxMap">
+  SELECT
+    re.REFRN_EMAILBOX_NO as recptn_emailbox_no,
+    re.EMAIL_CC_NO as email_rcver_no,
+    TO_CHAR(re.recptn_dt,'YYYY-MM-DD HH24:MI:SS') AS recptn_dt,
+    TO_CHAR(re.readng_dt,'YYYY-MM-DD HH24:MI:SS') AS readng_dt,
+    re.del_yn,
+    e.email_no, e.wrter_emp_no, e.email_title, e.email_cn,
+    TO_CHAR(e.email_wrt_dt,'YYYY-MM-DD HH24:MI:SS') AS email_wrt_dt,
+    e.resve_dsptch_dt, e.temp_save_yn,  e.file_group_no, ep.emp_nm AS sender_emp_nm,
+    f.FILE_NO, f.ORIGINAL_NM, f.FILE_UPLOADER, f.SAVED_NM, f.FILE_PATH, f.FILE_SIZE, f.FILE_FANCYSIZE, f.FILE_MIME, f.FILE_REG_DT, f.DEL_YN
+  FROM REFRN_EMAILBOX re
+  INNER JOIN email e        ON re.email_no       = e.email_no
+  INNER JOIN emp   ep       ON e.wrter_emp_no    = ep.emp_no
+  LEFT OUTER JOIN FILES f on (f.file_group_no = e.file_group_no and f.del_yn = 'N')
+  WHERE re.REFRN_EMAILBOX_NO = #{param1}
+    AND re.del_yn = 'N'
+</select>
+
+<update id="markRefListAsDeleted">
+  UPDATE refrn_emailbox re
+     SET re.del_yn = 'Y'
+   WHERE re.refrn_emailbox_no IN
+   <foreach collection="param2" item="id" open="(" separator="," close=")">
+     #{id}
+   </foreach>
+     AND re.del_yn = 'N'
+     AND EXISTS (
+       SELECT 1
+         FROM email_cc cc
+        WHERE cc.email_cc_no = re.email_cc_no
+          AND cc.cc_emp_no   = #{param1}
+     )
+</update>
+
+<select id="selectSendCount" parameterType="kr.or.ddit.vo.PaginationInfoVO" resultType="int">
+  SELECT COUNT(1)
+    FROM email e
+    INNER JOIN dsptch_emailbox d ON d.email_no = e.email_no
+    INNER JOIN emp ep ON ep.emp_no = e.wrter_emp_no
+   WHERE d.dsptch_emp_no = #{empNo}
+     AND d.del_yn = 'N'
+  <include refid="searchmail"/>
+</select>
+
+<select id="selectSendList" parameterType="kr.or.ddit.vo.PaginationInfoVO"
+        resultType="kr.or.ddit.vo.SendEmailBoxVO">
+  SELECT b.*
+  FROM (
+        SELECT a.*,
+               ROW_NUMBER() OVER (ORDER BY a.dsptch_dt DESC, a.dsptch_emailbox_no DESC) AS rnum
+        FROM (
+              SELECT
+                e.email_no, e.wrter_emp_no, e.email_title, e.email_cn,
+                TO_CHAR(e.email_wrt_dt, 'YYYY-MM-DD HH24:MI:SS') AS email_wrt_dt,
+                TO_CHAR(e.resve_dsptch_dt, 'YYYY-MM-DD HH24:MI:SS') AS resve_dsptch_dt,
+                e.temp_save_yn, e.file_group_no,
+                ep.emp_nm AS sender_emp_nm,
+                TO_CHAR(d.dsptch_dt, 'YYYY-MM-DD') AS recptn_dt,
+                d.dsptch_dt,
+                d.dsptch_emailbox_no,
+                (
+                  SELECT LISTAGG(emp.emp_nm, ', ') WITHIN GROUP (ORDER BY er.email_rcver_no)
+                  FROM email_rcver er INNER JOIN emp ON emp.emp_no = er.rcver_emp_no
+                  WHERE er.email_no = e.email_no
+                ) AS rcver_names
+              FROM email e
+              INNER JOIN dsptch_emailbox d ON d.email_no = e.email_no
+              INNER JOIN emp ep ON ep.emp_no = e.wrter_emp_no
+              WHERE d.dsptch_emp_no = #{empNo}
+                AND d.del_yn = 'N'
+            ) a
+        WHERE 1 = 1
+        <include refid="srmail"/>
+      ) b
+  <![CDATA[
+    WHERE b.rnum >= #{startRow} AND b.rnum <= #{endRow}
+  ]]>
+  ORDER BY b.rnum
+</select>
+
+<sql id="srmail">
+  <if test="searchType != null and searchType != '' and searchWord != null and searchWord != ''">
+    <choose>
+      <when test="searchType == 'all'">
+        AND (
+             a.rcver_names LIKE '%' || #{searchWord} || '%'
+          OR a.email_title LIKE '%' || #{searchWord} || '%'
+        )
+      </when>
+      <when test="searchType == 'rcvrName'">
+        AND a.rcver_names LIKE '%' || #{searchWord} || '%'
+      </when>
+      <when test="searchType == 'emailTitle'">
+        AND a.email_title LIKE '%' || #{searchWord} || '%'
+      </when>
+    </choose>
+  </if>
+</sql>
+
+<select id="selectReceiptsForEmail" parameterType="long" resultType="map">
+  SELECT
+      er.rcver_emp_no,
+      ep.emp_nm AS rcver_emp_nm,
+      TO_CHAR(re.readng_dt, 'YYYY-MM-DD HH24:MI:SS') as readng_dt
+  FROM email_rcver er
+  INNER JOIN recptn_emailbox re ON re.email_rcver_no = er.email_rcver_no
+  INNER JOIN emp ep ON ep.emp_no = er.rcver_emp_no
+  WHERE er.email_no = #{emailNo}
+</select>
+
+<update id="markSentListAsDeleted">
+  UPDATE dsptch_emailbox d
+     SET d.del_yn = 'Y'
+   WHERE d.dsptch_emailbox_no IN
+   <foreach collection="param2" item="id" open="(" separator="," close=")">
+     #{id}
+   </foreach>
+     AND d.del_yn = 'N'
+     AND EXISTS (
+       SELECT 1
+         FROM email e
+        WHERE e.email_no = d.email_no
+          AND e.wrter_emp_no = #{param1}
+     )
+</update>
+
+<select id="selectSentDetail" parameterType="map" resultMap="sendEmailBoxMap">
+  SELECT
+    d.DSPTCH_EMAILBOX_NO AS recptn_emailbox_no,
+    e.EMAIL_NO, e.WRTER_EMP_NO, e.EMAIL_TITLE, e.EMAIL_CN,
+    TO_CHAR(e.EMAIL_WRT_DT,'YYYY-MM-DD HH24:MI:SS') AS email_wrt_dt,
+    TO_CHAR(d.DSPTCH_DT, 'YYYY-MM-DD HH24:MI:SS') AS recptn_dt,
+    d.DEL_YN, e.RESVE_DSPTCH_DT, e.TEMP_SAVE_YN, e.FILE_GROUP_NO,
+    ep.EMP_NM AS sender_emp_nm,
+    f.FILE_NO, f.ORIGINAL_NM, f.FILE_UPLOADER, f.SAVED_NM, f.FILE_PATH, f.FILE_SIZE, f.FILE_FANCYSIZE, f.FILE_MIME, f.FILE_REG_DT, f.DEL_YN,
+    (SELECT CASE WHEN COUNT(re.readng_dt) > 0
+                  THEN '읽음'
+                  ELSE '읽지 않음' END
+     FROM email_rcver er INNER JOIN recptn_emailbox re ON re.email_rcver_no = er.email_rcver_no
+     WHERE er.email_no = e.email_no
+    ) AS read_status
+  FROM DSPTCH_EMAILBOX d
+  INNER JOIN EMAIL e ON e.EMAIL_NO = d.EMAIL_NO
+  INNER JOIN EMP ep ON ep.EMP_NO = e.WRTER_EMP_NO
+  LEFT OUTER JOIN FILES f ON (f.file_group_no = e.file_group_no AND f.del_yn = 'N')
+  WHERE d.DSPTCH_EMP_NO = #{param1}
+    AND e.EMAIL_NO = #{param2}
+    AND d.DEL_YN = 'N'
+</select>
+
+<select id="getSentEmailUserList" parameterType="int" resultType="kr.or.ddit.vo.SendEmailBoxVO">
+  select 
+      recptn_emailbox_no, re.email_no, re.email_rcver_no, 
+      (select emp_nm from emp e where e.emp_no = er.rcver_emp_no) as sender_emp_nm,
+      recptn_dt, readng_dt, del_yn, recptn_status
+  from recptn_emailbox re left outer join email_rcver er on(re.email_rcver_no = er.email_rcver_no)
+  where re.email_no = #{emailNo}
+</select>
+
+<select id="getEmpNoFromEmail" parameterType="string" resultType="kr.or.ddit.vo.EmpVO">
+  select emp_no
+    from emp
+   where WNMPY_EMAIL = #{param1}
+</select>
+
+</mapper>

@@ -1,0 +1,811 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr" data-bs-theme="light" data-color-theme="Blue_Theme" data-layout="vertical">
+
+<head>
+  <!-- Required meta tags -->
+  <meta charset="UTF-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <!-- Favicon icon-->
+  <link rel="shortcut icon" type="image/png" href="../assets/images/logos/favicon.png" />
+
+  <!-- Core Css -->
+  <link rel="stylesheet" href="../assets/css/styles.css" />
+
+  <title>Modernize Bootstrap Admin</title>
+</head>
+    <style>
+        /* 커스텀 CSS를 여기에 추가 */
+        .list-group-menu .list-group-item {
+            cursor: pointer;
+            padding: 0;
+            border: 0;
+        }
+
+        .list-group-menu .menu-link {
+            display: flex;
+            align-items: center;
+            gap: 1.5rem;
+            padding: 0.5rem 1rem;
+            margin-bottom: 0.25rem;
+            color: #212529;
+            text-decoration: none;
+            border-radius: 0.25rem;
+            transition: background-color 0.2s ease-in-out;
+        }
+
+        .list-group-menu .menu-link:hover {
+            background-color: #f8f9fa;
+        }
+
+        .list-group-menu .submenu {
+            padding-left: 1.5rem;
+            list-style: none;
+            display: none;
+        }
+
+        .list-group-menu .submenu.show {
+            display: block;
+        }
+
+        .list-group-menu .menu-toggle {
+            margin-left: auto;
+            transition: transform 0.3s ease-in-out;
+        }
+
+        .list-group-menu .menu-toggle.open {
+            transform: rotate(90deg);
+        }
+    </style>
+<body class="link-sidebar">
+  <!-- Preloader -->
+  <div class="preloader">
+    <img src="../assets/images/logos/favicon.png" alt="loader" class="lds-ripple img-fluid" />
+  </div>
+  <div id="main-wrapper">
+    <!-- Sidebar Start -->
+    <aside class="left-sidebar with-vertical">
+      <div><!-- ---------------------------------- -->
+        <!-- Start Vertical Layout Sidebar -->
+        <!-- ---------------------------------- -->
+        <div class="brand-logo d-flex align-items-center justify-content-between">
+          <a href="../main/index.html" class="text-nowrap logo-img">
+            <img src="../assets/images/logos/dark-logo.svg" class="dark-logo" alt="Logo-Dark" />
+            <img src="../assets/images/logos/light-logo.svg" class="light-logo" alt="Logo-light" />
+          </a>
+          <a href="javascript:void(0)" class="sidebartoggler ms-auto text-decoration-none fs-5 d-block d-xl-none">
+            <i class="ti ti-x"></i>
+          </a>
+        </div>
+
+        <nav class="sidebar-nav scroll-sidebar" data-simplebar>
+          <ul id="sidebarnav">
+            <!-- ---------------------------------- -->
+            <!-- Home -->
+            <!-- ---------------------------------- -->
+            <li class="nav-small-cap">
+              <i class="ti ti-dots nav-small-cap-icon fs-4"></i>
+              <span class="hide-menu">Home</span>
+            </li>
+            <!-- ---------------------------------- -->
+            <!-- Dashboard -->
+            <!-- ---------------------------------- -->
+            <li class="sidebar-item">
+              <a class="sidebar-link" href="" id="get-url" aria-expanded="false">
+                <span>
+                  <i class="ti ti-aperture"></i>
+                </span>
+                <span class="hide-menu">Modern</span>
+              </a>
+            </li>
+            
+
+
+            <!-- ---------------------------------- -->
+            <!-- OTHER -->
+            <!-- ---------------------------------- -->
+            <li class="nav-small-cap">
+              <i class="ti ti-dots nav-small-cap-icon fs-4"></i>
+              <span class="hide-menu">OTHER</span>
+            </li>
+            <li class="sidebar-item">
+              <a class="sidebar-link has-arrow" href="javascript:void(0)" aria-expanded="false">
+                <span class="d-flex">
+                  <i class="ti ti-box-multiple"></i>
+                </span>
+                <span class="hide-menu">Menu Level</span>
+              </a>
+              <ul aria-expanded="false" class="collapse first-level">
+                <li class="sidebar-item">
+                  <a href="javascript:void(0)" class="sidebar-link">
+                    <div class="round-16 d-flex align-items-center justify-content-center">
+                      <i class="ti ti-circle"></i>
+                    </div>
+                    <span class="hide-menu">Level 1</span>
+                  </a>
+                </li>
+                <li class="sidebar-item">
+                  <a class="sidebar-link has-arrow" href="javascript:void(0)" aria-expanded="false">
+                    <div class="round-16 d-flex align-items-center justify-content-center">
+                      <i class="ti ti-circle"></i>
+                    </div>
+                    <span class="hide-menu">Level 1.1</span>
+                  </a>
+                  <ul aria-expanded="false" class="collapse two-level">
+                    <li class="sidebar-item">
+                      <a href="javascript:void(0)" class="sidebar-link">
+                        <div class="round-16 d-flex align-items-center justify-content-center">
+                          <i class="ti ti-circle"></i>
+                        </div>
+                        <span class="hide-menu">Level 2</span>
+                      </a>
+                    </li>
+                    <li class="sidebar-item">
+                      <a class="sidebar-link has-arrow" href="javascript:void(0)" aria-expanded="false">
+                        <div class="round-16 d-flex align-items-center justify-content-center">
+                          <i class="ti ti-circle"></i>
+                        </div>
+                        <span class="hide-menu">Level 2.1</span>
+                      </a>
+                      <ul aria-expanded="false" class="collapse three-level">
+                        <li class="sidebar-item">
+                          <a href="javascript:void(0)" class="sidebar-link">
+                            <div class="round-16 d-flex align-items-center justify-content-center">
+                              <i class="ti ti-circle"></i>
+                            </div>
+                            <span class="hide-menu">Level 3</span>
+                          </a>
+                        </li>
+                        <li class="sidebar-item">
+                          <a href="javascript:void(0)" class="sidebar-link">
+                            <div class="round-16 d-flex align-items-center justify-content-center">
+                              <i class="ti ti-circle"></i>
+                            </div>
+                            <span class="hide-menu">Level 3.1</span>
+                          </a>
+                        </li>
+                      </ul>
+                    </li>
+                  </ul>
+                </li>
+              </ul>
+            </li>
+           
+          </ul>
+        </nav>
+
+        <div class="fixed-profile p-3 mx-4 mb-2 bg-secondary-subtle rounded mt-3">
+          <div class="hstack gap-3">
+            <div class="john-img">
+              <img src="../assets/images/profile/user-1.jpg" class="rounded-circle" width="40" height="40" alt="modernize-img" />
+            </div>
+            <div class="john-title">
+              <h6 class="mb-0 fs-4 fw-semibold">Mathew</h6>
+              <span class="fs-2">Designer</span>
+            </div>
+            <button class="border-0 bg-transparent text-primary ms-auto" tabindex="0" type="button" aria-label="logout" data-bs-toggle="tooltip" data-bs-placement="top" data-bs-title="logout">
+              <i class="ti ti-power fs-6"></i>
+            </button>
+          </div>
+        </div>
+
+        <!-- ---------------------------------- -->
+        <!-- Start Vertical Layout Sidebar -->
+        <!-- ---------------------------------- -->
+      </div>
+    </aside>
+    <!--  Sidebar End -->
+    <div class="page-wrapper">
+      <!--  Header Start -->
+      <header class="topbar">
+        <div class="with-vertical"><!-- ---------------------------------- -->
+          <!-- Start Vertical Layout Header -->
+          <!-- ---------------------------------- -->
+          <nav class="navbar navbar-expand-lg p-0">
+            <ul class="navbar-nav">
+              <li class="nav-item nav-icon-hover-bg rounded-circle ms-n2">
+                <a class="nav-link sidebartoggler" id="headerCollapse" href="javascript:void(0)">
+                  <i class="ti ti-menu-2"></i>
+                </a>
+              </li>
+            </ul>
+
+            
+          </nav>
+          <!-- ---------------------------------- -->
+          <!-- End Vertical Layout Header -->
+          <!-- ---------------------------------- -->
+
+          <!-- ------------------------------- -->
+          <!-- apps Dropdown in Small screen -->
+          <!-- ------------------------------- -->
+
+        </div>
+         
+      </header>
+
+      <div class="body-wrapper">
+        <div class="container">
+          <div class="card bg-info-subtle shadow-none position-relative overflow-hidden mb-4">
+            <div class="card-body px-4 py-3">
+              <div class="row align-items-center">
+                <div class="col-9">
+                  <h4 class="fw-semibold mb-8">프로젝트</h4>
+                  <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                      <li class="breadcrumb-item">
+                        <a class="text-muted text-decoration-none" href="../main/index.html">Home</a>
+                      </li>
+                      <li class="breadcrumb-item" aria-current="page">Project</li>
+                    </ol>
+                  </nav>
+                </div>
+                <div class="col-3">
+                  <div class="text-center mb-n5">
+                    <img src="../assets/images/breadcrumb/ChatBc.png" alt="modernize-img" class="img-fluid mb-n4" />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="card overflow-hidden chat-application">
+            <div class="d-flex align-items-center justify-content-between gap-6 m-3 d-lg-none">
+              <button class="btn btn-primary d-flex" type="button" data-bs-toggle="offcanvas" data-bs-target="#chat-sidebar" aria-controls="chat-sidebar">
+                <i class="ti ti-menu-2 fs-5"></i>
+              </button>
+              <form class="position-relative w-100">
+                <input type="text" class="form-control search-chat py-2 ps-5" id="text-srh" placeholder="Search Contact" />
+                <i class="ti ti-search position-absolute top-50 start-0 translate-middle-y fs-6 text-dark ms-3"></i>
+              </form>
+            </div>
+            <div class="d-flex w-100">
+              <div class="left-part border-end w-20 flex-shrink-0 d-none d-lg-block">
+                <div class="px-6 pt-4">
+				  <div class="card">
+				    <div class="card-header">
+					  <div class="d-flex align-items-center">
+					    <h6 class="card-title 1h-base">전자결재</h6>
+						<div class="ms-auto">
+						  <div class="link d-flex btn-minimize px-2 text-white align-items-center">
+						    <button class="btn btn-sm btn-outline-primary">새 결제 작성</button>
+						  </div>
+						</div>
+					  </div>
+						<div class="row px-6">
+						  김지후 (디자인팀 사원)
+						</div>
+					</div>
+				  </div>
+                </div>
+                <ul class="list-group list-group-menu mh-n100">
+					<li class="border-bottom my-3"></li>
+					<li class="list-group-item has-submenu">
+						<a class="menu-link" href="#">
+							<i class="ti ti-folder fs-5"></i>
+							결재 상신함
+							<i class="ti ti-chevron-right menu-toggle"></i>
+						</a>
+						<ul class="submenu">
+							<li class="list-group-item">
+								<a class="menu-link" href="#">
+									<i class="ti ti-file-text fs-5"></i>
+									결재대기
+								</a>
+							</li>
+							<li class="list-group-item">
+								<a class="menu-link" href="#">
+									<i class="ti ti-trash fs-5"></i>
+									결재진행
+								</a>
+							</li>
+							<li class="list-group-item">
+								<a class="menu-link" href="#">
+									<i class="ti ti-trash fs-5"></i>
+									결재완료
+								</a>
+							</li>
+							<li class="list-group-item">
+								<a class="menu-link" href="#">
+									<i class="ti ti-trash fs-5"></i>
+									임시저장
+								</a>
+							</li>
+							<li class="list-group-item">
+								<a class="menu-link" href="#">
+									<i class="ti ti-trash fs-5"></i>
+									반려함
+								</a>
+							</li>
+						</ul>
+					</li>
+					<li class="list-group-item has-submenu">
+						<a class="menu-link" href="#">
+							<i class="ti ti-folder fs-5"></i>
+							결재 수신함
+							<i class="ti ti-chevron-right menu-toggle"></i>
+						</a>
+						<ul class="submenu">
+							<li class="list-group-item">
+								<a class="menu-link" href="#">
+									<i class="ti ti-file-text fs-5"></i>
+									수신결재
+								</a>
+							</li>
+							<li class="list-group-item">
+								<a class="menu-link" href="#">
+									<i class="ti ti-trash fs-5"></i>
+									결재내역
+								</a>
+							</li>
+							<li class="list-group-item">
+								<a class="menu-link" href="#">
+									<i class="ti ti-trash fs-5"></i>
+									수신참조
+								</a>
+							</li>
+						</ul>
+					</li>
+					<li class="border-bottom my-3"></li>
+					<li class="fw-semibold text-dark text-uppercase mx-9 my-2 px-3 fs-2">
+						LABELS
+					</li>
+					<li class="list-group-item">
+						<a class="menu-link" href="#">
+							<i class="ti ti-folder fs-5 text-primary"></i>
+							전자결재 양식
+						</a>
+					</li>
+					<li class="list-group-item">
+						<a class="menu-link" href="#">
+							<i class="ti ti-folder fs-5 text-warning"></i>
+							휴지통
+						</a>
+					</li>
+				</ul>
+              </div>
+              <div class="d-flex w-100">
+                <div class="w-100">
+				프로젝트 UI를 만들어주세요.
+                </div>
+              </div>
+
+              <div class="offcanvas offcanvas-start user-chat-box" tabindex="-1" id="chat-sidebar" aria-labelledby="offcanvasExampleLabel">
+                <div class="offcanvas-header">
+                  <h5 class="offcanvas-title" id="offcanvasExampleLabel">
+                    Email
+                  </h5>
+                  <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+                </div>
+                <div class="px-9 pt-4 pb-3">
+                  <button class="btn btn-primary fw-semibold py-8 w-100" data-bs-toggle="modal" data-bs-target="#compose">
+                    Compose
+                  </button>
+                </div>
+                <ul class="list-group h-n150" data-simplebar>
+                  <li class="list-group-item border-0 p-0 mx-9">
+                    <a class="d-flex align-items-center gap-6 list-group-item-action text-dark px-3 py-8 mb-1 rounded-1" href="javascript:void(0)">
+                      <i class="ti ti-inbox fs-5"></i>Inbox
+                    </a>
+                  </li>
+                  <li class="list-group-item border-0 p-0 mx-9">
+                    <a class="d-flex align-items-center gap-6 list-group-item-action text-dark px-3 py-8 mb-1 rounded-1" href="javascript:void(0)">
+                      <i class="ti ti-brand-telegram fs-5"></i>Sent
+                    </a>
+                  </li>
+                  <li class="list-group-item border-0 p-0 mx-9">
+                    <a class="d-flex align-items-center gap-6 list-group-item-action text-dark px-3 py-8 mb-1 rounded-1" href="javascript:void(0)">
+                      <i class="ti ti-file-text fs-5"></i>Draft
+                    </a>
+                  </li>
+                  <li class="list-group-item border-0 p-0 mx-9">
+                    <a class="d-flex align-items-center gap-6 list-group-item-action text-dark px-3 py-8 mb-1 rounded-1" href="javascript:void(0)">
+                      <i class="ti ti-inbox fs-5"></i>Spam
+                    </a>
+                  </li>
+                  <li class="list-group-item border-0 p-0 mx-9">
+                    <a class="d-flex align-items-center gap-6 list-group-item-action text-dark px-3 py-8 mb-1 rounded-1" href="javascript:void(0)">
+                      <i class="ti ti-trash fs-5"></i>Trash
+                    </a>
+                  </li>
+                  <li class="border-bottom my-3"></li>
+                  <li class="fw-semibold text-dark text-uppercase mx-9 my-2 px-3 fs-2">
+                    IMPORTANT
+                  </li>
+                  <li class="list-group-item border-0 p-0 mx-9">
+                    <a class="d-flex align-items-center gap-6 list-group-item-action text-dark px-3 py-8 mb-1 rounded-1" href="javascript:void(0)">
+                      <i class="ti ti-star fs-5"></i>Starred
+                    </a>
+                  </li>
+                  <li class="list-group-item border-0 p-0 mx-9">
+                    <a class="d-flex align-items-center gap-6 list-group-item-action text-dark px-3 py-8 mb-1 rounded-1" href="javascript:void(0)" class="d-block">
+                      <i class="ti ti-badge fs-5"></i>Important
+                    </a>
+                  </li>
+                  <li class="border-bottom my-3"></li>
+                  <li class="fw-semibold text-dark text-uppercase mx-9 my-2 px-3 fs-2">
+                    LABELS
+                  </li>
+                  <li class="list-group-item border-0 p-0 mx-9">
+                    <a class="d-flex align-items-center gap-6 list-group-item-action text-dark px-3 py-8 mb-1 rounded-1" href="javascript:void(0)">
+                      <i class="ti ti-bookmark fs-5 text-primary"></i>Promotional
+                    </a>
+                  </li>
+                  <li class="list-group-item border-0 p-0 mx-9">
+                    <a class="d-flex align-items-center gap-6 list-group-item-action text-dark px-3 py-8 mb-1 rounded-1" href="javascript:void(0)">
+                      <i class="ti ti-bookmark fs-5 text-warning"></i>Social
+                    </a>
+                  </li>
+                  <li class="list-group-item border-0 p-0 mx-9">
+                    <a class="d-flex align-items-center gap-6 list-group-item-action text-dark px-3 py-8 mb-1 rounded-1" href="javascript:void(0)">
+                      <i class="ti ti-bookmark fs-5 text-success"></i>Health
+                    </a>
+                  </li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <script>
+  function handleColorTheme(e) {
+    document.documentElement.setAttribute("data-color-theme", e);
+  }
+</script>
+      <button class="btn btn-primary p-3 rounded-circle d-flex align-items-center justify-content-center customizer-btn" type="button" data-bs-toggle="offcanvas" data-bs-target="#offcanvasExample" aria-controls="offcanvasExample">
+        <i class="icon ti ti-settings fs-7"></i>
+      </button>
+
+      <div class="offcanvas customizer offcanvas-end" tabindex="-1" id="offcanvasExample" aria-labelledby="offcanvasExampleLabel">
+        <div class="d-flex align-items-center justify-content-between p-3 border-bottom">
+          <h4 class="offcanvas-title fw-semibold" id="offcanvasExampleLabel">
+            Settings
+          </h4>
+          <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+        </div>
+        <div class="offcanvas-body h-n80" data-simplebar>
+          <h6 class="fw-semibold fs-4 mb-2">Theme</h6>
+
+          <div class="d-flex flex-row gap-3 customizer-box" role="group">
+            <input type="radio" class="btn-check light-layout" name="theme-layout" id="light-layout" autocomplete="off" />
+            <label class="btn p-9 btn-outline-primary rounded-2" for="light-layout">
+              <i class="icon ti ti-brightness-up fs-7 me-2"></i>Light
+            </label>
+
+            <input type="radio" class="btn-check dark-layout" name="theme-layout" id="dark-layout" autocomplete="off" />
+            <label class="btn p-9 btn-outline-primary rounded-2" for="dark-layout">
+              <i class="icon ti ti-moon fs-7 me-2"></i>Dark
+            </label>
+          </div>
+
+          <h6 class="mt-5 fw-semibold fs-4 mb-2">Theme Direction</h6>
+          <div class="d-flex flex-row gap-3 customizer-box" role="group">
+            <input type="radio" class="btn-check" name="direction-l" id="ltr-layout" autocomplete="off" />
+            <label class="btn p-9 btn-outline-primary" for="ltr-layout">
+              <i class="icon ti ti-text-direction-ltr fs-7 me-2"></i>LTR
+            </label>
+
+            <input type="radio" class="btn-check" name="direction-l" id="rtl-layout" autocomplete="off" />
+            <label class="btn p-9 btn-outline-primary" for="rtl-layout">
+              <i class="icon ti ti-text-direction-rtl fs-7 me-2"></i>RTL
+            </label>
+          </div>
+
+          <h6 class="mt-5 fw-semibold fs-4 mb-2">Theme Colors</h6>
+
+          <div class="d-flex flex-row flex-wrap gap-3 customizer-box color-pallete" role="group">
+            <input type="radio" class="btn-check" name="color-theme-layout" id="Blue_Theme" autocomplete="off" />
+            <label class="btn p-9 btn-outline-primary d-flex align-items-center justify-content-center" onclick="handleColorTheme('Blue_Theme')" for="Blue_Theme" data-bs-toggle="tooltip" data-bs-placement="top" data-bs-title="BLUE_THEME">
+              <div class="color-box rounded-circle d-flex align-items-center justify-content-center skin-1">
+                <i class="ti ti-check text-white d-flex icon fs-5"></i>
+              </div>
+            </label>
+
+            <input type="radio" class="btn-check" name="color-theme-layout" id="Aqua_Theme" autocomplete="off" />
+            <label class="btn p-9 btn-outline-primary d-flex align-items-center justify-content-center" onclick="handleColorTheme('Aqua_Theme')" for="Aqua_Theme" data-bs-toggle="tooltip" data-bs-placement="top" data-bs-title="AQUA_THEME">
+              <div class="color-box rounded-circle d-flex align-items-center justify-content-center skin-2">
+                <i class="ti ti-check text-white d-flex icon fs-5"></i>
+              </div>
+            </label>
+
+            <input type="radio" class="btn-check" name="color-theme-layout" id="Purple_Theme" autocomplete="off" />
+            <label class="btn p-9 btn-outline-primary d-flex align-items-center justify-content-center" onclick="handleColorTheme('Purple_Theme')" for="Purple_Theme" data-bs-toggle="tooltip" data-bs-placement="top" data-bs-title="PURPLE_THEME">
+              <div class="color-box rounded-circle d-flex align-items-center justify-content-center skin-3">
+                <i class="ti ti-check text-white d-flex icon fs-5"></i>
+              </div>
+            </label>
+
+            <input type="radio" class="btn-check" name="color-theme-layout" id="green-theme-layout" autocomplete="off" />
+            <label class="btn p-9 btn-outline-primary d-flex align-items-center justify-content-center" onclick="handleColorTheme('Green_Theme')" for="green-theme-layout" data-bs-toggle="tooltip" data-bs-placement="top" data-bs-title="GREEN_THEME">
+              <div class="color-box rounded-circle d-flex align-items-center justify-content-center skin-4">
+                <i class="ti ti-check text-white d-flex icon fs-5"></i>
+              </div>
+            </label>
+
+            <input type="radio" class="btn-check" name="color-theme-layout" id="cyan-theme-layout" autocomplete="off" />
+            <label class="btn p-9 btn-outline-primary d-flex align-items-center justify-content-center" onclick="handleColorTheme('Cyan_Theme')" for="cyan-theme-layout" data-bs-toggle="tooltip" data-bs-placement="top" data-bs-title="CYAN_THEME">
+              <div class="color-box rounded-circle d-flex align-items-center justify-content-center skin-5">
+                <i class="ti ti-check text-white d-flex icon fs-5"></i>
+              </div>
+            </label>
+
+            <input type="radio" class="btn-check" name="color-theme-layout" id="orange-theme-layout" autocomplete="off" />
+            <label class="btn p-9 btn-outline-primary d-flex align-items-center justify-content-center" onclick="handleColorTheme('Orange_Theme')" for="orange-theme-layout" data-bs-toggle="tooltip" data-bs-placement="top" data-bs-title="ORANGE_THEME">
+              <div class="color-box rounded-circle d-flex align-items-center justify-content-center skin-6">
+                <i class="ti ti-check text-white d-flex icon fs-5"></i>
+              </div>
+            </label>
+          </div>
+
+          <h6 class="mt-5 fw-semibold fs-4 mb-2">Layout Type</h6>
+          <div class="d-flex flex-row gap-3 customizer-box" role="group">
+            <div>
+              <input type="radio" class="btn-check" name="page-layout" id="vertical-layout" autocomplete="off" />
+              <label class="btn p-9 btn-outline-primary" for="vertical-layout">
+                <i class="icon ti ti-layout-sidebar-right fs-7 me-2"></i>Vertical
+              </label>
+            </div>
+            <div>
+              <input type="radio" class="btn-check" name="page-layout" id="horizontal-layout" autocomplete="off" />
+              <label class="btn p-9 btn-outline-primary" for="horizontal-layout">
+                <i class="icon ti ti-layout-navbar fs-7 me-2"></i>Horizontal
+              </label>
+            </div>
+          </div>
+
+          <h6 class="mt-5 fw-semibold fs-4 mb-2">Container Option</h6>
+
+          <div class="d-flex flex-row gap-3 customizer-box" role="group">
+            <input type="radio" class="btn-check" name="layout" id="boxed-layout" autocomplete="off" />
+            <label class="btn p-9 btn-outline-primary" for="boxed-layout">
+              <i class="icon ti ti-layout-distribute-vertical fs-7 me-2"></i>Boxed
+            </label>
+
+            <input type="radio" class="btn-check" name="layout" id="full-layout" autocomplete="off" />
+            <label class="btn p-9 btn-outline-primary" for="full-layout">
+              <i class="icon ti ti-layout-distribute-horizontal fs-7 me-2"></i>Full
+            </label>
+          </div>
+
+          <h6 class="fw-semibold fs-4 mb-2 mt-5">Sidebar Type</h6>
+          <div class="d-flex flex-row gap-3 customizer-box" role="group">
+            <a href="javascript:void(0)" class="fullsidebar">
+              <input type="radio" class="btn-check" name="sidebar-type" id="full-sidebar" autocomplete="off" />
+              <label class="btn p-9 btn-outline-primary" for="full-sidebar">
+                <i class="icon ti ti-layout-sidebar-right fs-7 me-2"></i>Full
+              </label>
+            </a>
+            <div>
+              <input type="radio" class="btn-check " name="sidebar-type" id="mini-sidebar" autocomplete="off" />
+              <label class="btn p-9 btn-outline-primary" for="mini-sidebar">
+                <i class="icon ti ti-layout-sidebar fs-7 me-2"></i>Collapse
+              </label>
+            </div>
+          </div>
+
+          <h6 class="mt-5 fw-semibold fs-4 mb-2">Card With</h6>
+
+          <div class="d-flex flex-row gap-3 customizer-box" role="group">
+            <input type="radio" class="btn-check" name="card-layout" id="card-with-border" autocomplete="off" />
+            <label class="btn p-9 btn-outline-primary" for="card-with-border">
+              <i class="icon ti ti-border-outer fs-7 me-2"></i>Border
+            </label>
+
+            <input type="radio" class="btn-check" name="card-layout" id="card-without-border" autocomplete="off" />
+            <label class="btn p-9 btn-outline-primary" for="card-without-border">
+              <i class="icon ti ti-border-none fs-7 me-2"></i>Shadow
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <!-- Modal -->
+      <div class="modal fade" id="compose" tabindex="-1" aria-labelledby="exampleModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-fullscreen-md-down modal-dialog-centered">
+          <div class="modal-content">
+            <div class="modal-header bg-light">
+              <h5 class="modal-title fs-3" id="exampleModalLabel">
+                New Message
+              </h5>
+              <button type="button" class="btn-close fs-1" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+              <form>
+                <div class="mb-3 input-group">
+                  <input type="email" class="form-control" id="text-email" placeholder="Recipients" />
+                  <input type="radio" class="btn-check" name="options" id="option1" autocomplete="off" checked />
+                  <label class="btn btn-primary" for="option1">Cc</label>
+                  <input type="radio" class="btn-check" name="options" id="option2" autocomplete="off" />
+                  <label class="btn btn-primary" for="option2">Bcc</label>
+                </div>
+                <div>
+                  <textarea class="form-control" id="text-subject" rows="6" placeholder="Subject"></textarea>
+                </div>
+              </form>
+            </div>
+            <div class="modal-footer justify-content-start">
+              <button type="button" class="btn btn-primary d-none d-md-inline" data-bs-dismiss="modal">
+                Send
+              </button>
+              <div class="ms-6 d-flex flex-wrap gap-1">
+                <a href="javascript:void(0)" class="d-flex nav-icon-hover-bg rounded-1">
+                  <iconify-icon icon="solar:link-circle-line-duotone" class="fs-7"></iconify-icon>
+                </a>
+                <a href="javascript:void(0)" class="d-flex nav-icon-hover-bg rounded-1">
+                  <iconify-icon icon="solar:gallery-send-line-duotone" class="fs-7"></iconify-icon>
+                </a>
+                <a href="javascript:void(0)" class="d-flex nav-icon-hover-bg rounded-1">
+                  <iconify-icon icon="solar:text-square-line-duotone" class="fs-7"></iconify-icon>
+                </a>
+                <a href="javascript:void(0)" class="d-flex nav-icon-hover-bg rounded-1">
+                  <iconify-icon icon="solar:eraser-square-line-duotone" class="fs-7"></iconify-icon>
+                </a>
+                <a href="javascript:void(0)" class="d-flex nav-icon-hover-bg rounded-1">
+                  <iconify-icon icon="solar:text-underline-cross-line-duotone" class="fs-7"></iconify-icon>
+                </a>
+                <a href="javascript:void(0)" class="d-flex nav-icon-hover-bg rounded-1">
+                  <iconify-icon icon="solar:text-bold-square-line-duotone" class="fs-7"></iconify-icon>
+                </a>
+                <a href="javascript:void(0)" class="d-flex nav-icon-hover-bg rounded-1">
+                  <iconify-icon icon="solar:text-italic-square-line-duotone" class="fs-7"></iconify-icon>
+                </a>
+              </div>
+              <div class="ms-md-auto d-flex align-items-center justify-content-between">
+                <button type="button" class="btn btn-primary d-inline d-md-none" data-bs-dismiss="modal">
+                  Send
+                </button>
+                <a href="javascript:void(0)" class="d-flex nav-icon-hover-bg rounded ms-6 ms-md-0">
+                  <iconify-icon icon="solar:trash-bin-minimalistic-line-duotone" class="fs-7"></iconify-icon>
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <!--  Search Bar -->
+    <div class="modal fade" id="exampleModal" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-scrollable modal-lg">
+        <div class="modal-content rounded-1">
+          <div class="modal-header border-bottom">
+            <input type="search" class="form-control fs-3" placeholder="Search here" id="search" />
+            <a href="javascript:void(0)" data-bs-dismiss="modal" class="lh-1">
+              <i class="ti ti-x fs-5 ms-3"></i>
+            </a>
+          </div>
+          <div class="modal-body message-body" data-simplebar="">
+            <h5 class="mb-0 fs-5 p-1">Quick Page Links</h5>
+            <ul class="list mb-0 py-2">
+              <li class="p-1 mb-1 bg-hover-light-black">
+                <a href="javascript:void(0)">
+                  <span class="d-block">Modern</span>
+                  <span class="text-muted d-block">/dashboards/dashboard1</span>
+                </a>
+              </li>
+              <li class="p-1 mb-1 bg-hover-light-black">
+                <a href="javascript:void(0)">
+                  <span class="d-block">Dashboard</span>
+                  <span class="text-muted d-block">/dashboards/dashboard2</span>
+                </a>
+              </li>
+              <li class="p-1 mb-1 bg-hover-light-black">
+                <a href="javascript:void(0)">
+                  <span class="d-block">Contacts</span>
+                  <span class="text-muted d-block">/apps/contacts</span>
+                </a>
+              </li>
+              <li class="p-1 mb-1 bg-hover-light-black">
+                <a href="javascript:void(0)">
+                  <span class="d-block">Posts</span>
+                  <span class="text-muted d-block">/apps/blog/posts</span>
+                </a>
+              </li>
+              <li class="p-1 mb-1 bg-hover-light-black">
+                <a href="javascript:void(0)">
+                  <span class="d-block">Detail</span>
+                  <span class="text-muted d-block">/apps/blog/detail/streaming-video-way-before-it-was-cool-go-dark-tomorrow</span>
+                </a>
+              </li>
+              <li class="p-1 mb-1 bg-hover-light-black">
+                <a href="javascript:void(0)">
+                  <span class="d-block">Shop</span>
+                  <span class="text-muted d-block">/apps/ecommerce/shop</span>
+                </a>
+              </li>
+              <li class="p-1 mb-1 bg-hover-light-black">
+                <a href="javascript:void(0)">
+                  <span class="d-block">Modern</span>
+                  <span class="text-muted d-block">/dashboards/dashboard1</span>
+                </a>
+              </li>
+              <li class="p-1 mb-1 bg-hover-light-black">
+                <a href="javascript:void(0)">
+                  <span class="d-block">Dashboard</span>
+                  <span class="text-muted d-block">/dashboards/dashboard2</span>
+                </a>
+              </li>
+              <li class="p-1 mb-1 bg-hover-light-black">
+                <a href="javascript:void(0)">
+                  <span class="d-block">Contacts</span>
+                  <span class="text-muted d-block">/apps/contacts</span>
+                </a>
+              </li>
+              <li class="p-1 mb-1 bg-hover-light-black">
+                <a href="javascript:void(0)">
+                  <span class="d-block">Posts</span>
+                  <span class="text-muted d-block">/apps/blog/posts</span>
+                </a>
+              </li>
+              <li class="p-1 mb-1 bg-hover-light-black">
+                <a href="javascript:void(0)">
+                  <span class="d-block">Detail</span>
+                  <span class="text-muted d-block">/apps/blog/detail/streaming-video-way-before-it-was-cool-go-dark-tomorrow</span>
+                </a>
+              </li>
+              <li class="p-1 mb-1 bg-hover-light-black">
+                <a href="javascript:void(0)">
+                  <span class="d-block">Shop</span>
+                  <span class="text-muted d-block">/apps/ecommerce/shop</span>
+                </a>
+              </li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script>
+    document.addEventListener("DOMContentLoaded", function() {
+        const submenuItems = document.querySelectorAll('.has-submenu > .menu-link');
+
+        submenuItems.forEach(item => {
+            item.addEventListener('click', function(e) {
+                // 기본 링크 이동을 막습니다.
+                e.preventDefault();
+
+                // 현재 메뉴 아이템의 부모 요소(li)를 찾습니다.
+                const parentLi = this.parentElement;
+                
+                // 해당 부모 li 바로 아래에 있는 서브메뉴(ul)를 찾습니다.
+                const submenu = parentLi.querySelector('.submenu');
+                
+                // 서브메뉴가 존재하면 토글합니다.
+                if (submenu) {
+                    submenu.classList.toggle('show');
+                    // 화살표 아이콘을 회전시킵니다.
+                    const toggleIcon = this.querySelector('.menu-toggle');
+                    if (toggleIcon) {
+                        toggleIcon.classList.toggle('open');
+                    }
+                }
+            });
+        });
+    });
+</script>
+  <div class="dark-transparent sidebartoggler"></div>
+  <script src="../assets/js/vendor.min.js"></script>
+  <!-- Import Js Files -->
+  <script src="../assets/libs/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="../assets/libs/simplebar/dist/simplebar.min.js"></script>
+  <script src="../assets/js/theme/app.init.js"></script>
+  <script src="../assets/js/theme/theme.js"></script>
+  <script src="../assets/js/theme/app.min.js"></script>
+  <script src="../assets/js/theme/sidebarmenu.js"></script>
+
+  <!-- solar icons -->
+  <script src="https://cdn.jsdelivr.net/npm/iconify-icon@1.0.8/dist/iconify-icon.min.js"></script>
+
+  <!-- highlight.js (code view) -->
+  <script src="../assets/js/highlights/highlight.min.js"></script>
+  <script>
+  hljs.initHighlightingOnLoad();
+
+
+  document.querySelectorAll("pre.code-view > code").forEach((codeBlock) => {
+    codeBlock.textContent = codeBlock.innerHTML;
+  });
+</script>
+  <script src="../assets/js/apps/chat.js"></script>
+</body>
+
+</html>

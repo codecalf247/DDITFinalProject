@@ -1,0 +1,357 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.or.ddit.employee.library.Tlibrary.mapper.ItlibraryMapper">
+
+  <insert id="TinsertFolder" parameterType="foldersVO">
+        <selectKey resultType="int" order="BEFORE" keyProperty="folderNo">
+            SELECT SEQ_FOLDER.NEXTVAL FROM DUAL
+        </selectKey>
+        INSERT INTO FOLDERS
+            (
+                FOLDER_NO,
+                UPPER_FOLDER,
+                EMP_NO,
+                FOLDER_NAME,
+                FOLDER_CRT_YMD,
+                FOLDER_TY,
+                DEPT_NO,
+                DEL_YN
+            )
+        VALUES
+            (
+                #{folderNo},
+                #{upperFolder},
+                #{empNo},
+                #{folderName},
+                TO_CHAR(SYSDATE, 'YYYYMMDD'),
+                #{folderTy},
+                #{deptNo},
+                #{delYn}
+            )
+    </insert>
+
+    <insert id="TinsertFile" parameterType="folderFileVO">
+        <selectKey resultType="int" order="BEFORE" keyProperty="fileNo">
+            SELECT SEQ_FOLDER_FILE.NEXTVAL FROM DUAL
+        </selectKey>
+        INSERT INTO FOLDER_FILE
+            (
+                FILE_NO,
+                EMP_NO,
+                DEPT_NO,
+                FOLDER_NO,
+                ORIGINAL_NM,
+                SAVED_NAME,
+                FILE_PATH,
+                FILE_SIZE,
+                FILE_FANCYSIZE,
+                FILE_MIME,
+                FILE_REG_DT,
+                DEL_YN
+            )
+        VALUES
+            (
+                #{fileNo},
+                #{empNo},
+                #{deptNo},
+                #{folderNo},
+                #{originalNm},
+                #{savedName},
+                #{filePath},
+                #{fileSize},
+                #{fileFancysize},
+                #{fileMime},
+                SYSDATE,
+                #{delYn}
+            )
+    </insert>
+    
+    <select id="selectTfolderList" parameterType="map" resultType="foldersVO">
+    	SELECT
+    		FOLDER_NO,
+    		UPPER_FOLDER,
+    		f.EMP_NO,
+    		FOLDER_NAME,
+    		FOLDER_CRT_YMD,
+    		FOLDER_MDFCN_YMD,
+    		FOLDER_TY,
+    		f.DEPT_NO,
+    		f.DEL_YN,
+    		e.emp_nm
+    	FROM FOLDERS f
+    	INNER JOIN EMP e ON f.emp_no = e.emp_no
+    	WHERE
+    		f.DEPT_NO = #{deptNo}
+    	AND
+    		FOLDER_TY = '10002'
+    	<if test="searchType != 'folderName'">
+	    	AND
+	    		UPPER_FOLDER
+	        <if test="upperFolder != null and upperFolder != 0">
+	            = #{upperFolder}
+	        </if>
+	        <if test="upperFolder == null or upperFolder == 0">
+	            IS NULL
+	        </if>
+        </if>
+    	<if test="searchType eq 'fileName'">
+	        AND 1 = 0
+	    </if> 
+    	AND
+    		f.DEL_YN = 'N'
+    	<include refid="searchFolders" />
+    </select>
+    
+    <select id="selectTfileList" parameterType="map" resultType="folderFileVO">
+       SELECT
+	            FILE_NO,
+	            ff.EMP_NO,
+	            ff.FOLDER_NO,
+	            ff.DEPT_NO,
+	            ORIGINAL_NM,
+	            SAVED_NAME,
+	            FILE_PATH,
+	            FILE_SIZE,
+	            FILE_FANCYSIZE,
+	            FILE_MIME,
+	            FILE_REG_DT,
+	            ff.DEL_YN,
+	            e.emp_nm
+	        FROM FOLDER_FILE ff
+	        INNER JOIN FOLDERS f on (f.folder_no = ff.folder_no)
+	        INNER JOIN EMP e on (e.emp_no = ff.emp_no)
+	        WHERE
+	            ff.DEPT_NO = #{deptNo}
+	        <if test="searchType eq 'folderName'">
+	        	AND 1 = 0
+	       </if> 
+	        AND 
+	            (f.folder_ty = '10002' OR ff.folder_no = 2)
+	        AND
+	            ff.DEL_YN = 'N'
+	       <if test="searchType != 'fileName'">
+	        AND 
+	        	ff.FOLDER_NO = #{folderNo} 
+	       </if> 
+
+	         <include refid="searchFiles" />     
+    </select>
+    
+    <select id="selectFolder" parameterType="int" resultType="foldersVO">
+        SELECT
+            FOLDER_NO,
+            UPPER_FOLDER,
+            EMP_NO,
+            FOLDER_NAME,
+            FOLDER_CRT_YMD,
+            FOLDER_MDFCN_YMD,
+            FOLDER_TY,
+            DEPT_NO,
+            DEL_YN
+        FROM FOLDERS
+        WHERE
+            FOLDER_NO = #{folderNo}
+    </select>
+    
+    <select id="selectFileByFileNo" parameterType="int" resultType="folderFileVO">
+        SELECT
+            FILE_NO,
+            EMP_NO,
+            DEPT_NO,
+            FOLDER_NO,
+            ORIGINAL_NM,
+            SAVED_NAME,
+            FILE_PATH,
+            FILE_SIZE,
+            FILE_FANCYSIZE,
+            FILE_MIME,
+            FILE_REG_DT,
+            DEL_YN
+        FROM FOLDER_FILE
+        WHERE
+            FILE_NO = #{fileNo}
+    </select>
+    
+    <update id="updateFileFolder" parameterType="map">
+        UPDATE FOLDER_FILE
+        SET
+            FOLDER_NO = #{targetFolderNo}
+        WHERE
+            FILE_NO = #{fileNo}
+    </update>
+
+    <update id="updateFolderParent" parameterType="map">
+        UPDATE FOLDERS
+        SET
+            UPPER_FOLDER = #{targetFolderNo},
+            FOLDER_MDFCN_YMD = TO_CHAR(SYSDATE, 'YYYYMMDD')
+        WHERE
+            FOLDER_NO = #{folderNo}
+    </update>
+    
+    <update id="updateFolderDelYn" parameterType="map">
+        UPDATE FOLDERS
+        SET
+            DEL_YN = #{delYn}
+        WHERE
+            FOLDER_NO = #{folderNo}
+    </update>
+    
+    <update id="updateFilesByFolderNo" parameterType="map">
+        UPDATE FOLDER_FILE
+        SET
+            DEL_YN = #{delYn}
+        WHERE
+            FOLDER_NO = #{folderNo}
+    </update>
+    
+    <update id="updateFileDelYn" parameterType="map">
+        UPDATE FOLDER_FILE
+        SET
+            DEL_YN = #{delYn}
+        WHERE
+            FILE_NO = #{fileNo}
+    </update>
+    
+    <update id="updateFolderRestore" parameterType="map">
+        UPDATE FOLDERS
+        SET
+            DEL_YN = 'N'
+        WHERE
+            FOLDER_NO = #{folderNo}
+    </update>
+    
+    <update id="updateFolderDelYnByFolderNo" parameterType="int">
+    UPDATE FOLDERS
+    SET
+        DEL_YN = 'Y'
+    WHERE
+        FOLDER_NO = #{folderNo}
+</update>
+
+
+<!-- 여기 추가해줭 -->
+<update id="updateFoldersDelYn" parameterType="map">
+    UPDATE FOLDERS
+       SET DEL_YN = #{delYn}
+     WHERE FOLDER_NO IN (
+            SELECT FOLDER_NO
+              FROM FOLDERS
+             START WITH FOLDER_NO = #{folderNo}
+             CONNECT BY PRIOR FOLDER_NO = UPPER_FOLDER
+          )
+</update>
+
+<update id="updateFolderFilesDelYn" parameterType="map">
+    UPDATE FOLDER_FILE
+       SET DEL_YN = #{delYn}
+     WHERE FOLDER_NO IN (
+            SELECT FOLDER_NO
+              FROM FOLDERS
+             START WITH FOLDER_NO = #{folderNo}
+             CONNECT BY PRIOR FOLDER_NO = UPPER_FOLDER
+          )
+</update>
+
+    
+    <select id="selectTyfolderList" parameterType="map" resultType="foldersVO">
+	         SELECT
+	        FOLDER_NO,
+	        UPPER_FOLDER,
+	        EMP_NO,
+	        FOLDER_NAME,
+	        FOLDER_CRT_YMD,
+	        FOLDER_MDFCN_YMD,
+	        FOLDER_TY,
+	        DEPT_NO,
+	        DEL_YN
+	    FROM FOLDERS
+	    WHERE
+	        DEPT_NO = #{deptNo}
+	    AND
+	        FOLDER_TY = '10002'
+	    AND
+	        DEL_YN = 'Y'
+</select>
+
+<select id="selectTyfileList" parameterType="map" resultType="folderFileVO">
+    SELECT
+        ff.FILE_NO,
+        ff.EMP_NO,
+        ff.DEPT_NO,
+        ff.FOLDER_NO,
+        ff.ORIGINAL_NM,
+        ff.SAVED_NAME,
+        ff.FILE_PATH,
+        ff.FILE_SIZE,
+        ff.FILE_FANCYSIZE,
+        ff.FILE_MIME,
+        ff.FILE_REG_DT,
+        ff.DEL_YN
+    FROM FOLDER_FILE ff
+    INNER JOIN FOLDERS f ON ff.FOLDER_NO = f.FOLDER_NO
+    WHERE
+        ff.DEPT_NO = #{deptNo}
+    AND
+        ff.DEL_YN = 'Y'
+
+</select>
+
+    <sql id="searchFiles">
+        <if test="searchType != null and searchWord != null and searchWord != ''">
+            <choose>
+                <when test="searchType eq 'fileName'">
+                    AND SAVED_NAME LIKE '%' || #{searchWord} || '%'
+                </when>
+            </choose>
+        </if>
+    </sql>
+
+    <sql id="searchFolders">
+        <if test="searchType != null and searchWord != null and searchWord != ''">
+            <choose>
+                <when test="searchType eq 'folderName'">
+                    AND FOLDER_NAME LIKE '%' || #{searchWord} || '%'
+                </when>
+            </choose>
+        </if>
+    </sql>
+
+	<select id="selectTotalFileSize" parameterType="java.lang.Integer" resultType="long">
+	    SELECT SUM(FILE_SIZE) AS TOTAL_SIZE
+	    FROM FOLDER_FILE
+	    WHERE DEPT_NO = #{deptNo}
+	      AND DEL_YN = 'N'
+	</select>
+
+    <delete id="tpermanentlyDeleteFile" parameterType="int">
+        DELETE FROM FOLDER_FILE
+        WHERE FILE_NO = #{fileNo}
+    </delete>
+    
+    <delete id="tpermanentlyDeleteFolder" parameterType="int">
+        DELETE FROM FOLDERS
+        WHERE FOLDER_NO = #{folderNo}
+    </delete>
+
+    <delete id="deleteFilesByFolderRecursively" parameterType="int">
+        DELETE FROM FOLDER_FILE
+        WHERE FOLDER_NO IN (
+            SELECT FOLDER_NO 
+            FROM FOLDERS
+            START WITH FOLDER_NO = #{folderNo}
+            CONNECT BY PRIOR FOLDER_NO = UPPER_FOLDER
+        )
+    </delete>
+
+    <delete id="deleteFoldersRecursively" parameterType="int">
+        DELETE FROM FOLDERS
+        WHERE FOLDER_NO IN (
+            SELECT FOLDER_NO 
+            FROM FOLDERS
+            START WITH FOLDER_NO = #{folderNo}
+            CONNECT BY PRIOR FOLDER_NO = UPPER_FOLDER
+        )
+    </delete>
+    
+</mapper>

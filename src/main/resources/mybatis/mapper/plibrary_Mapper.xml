@@ -1,0 +1,369 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.or.ddit.employee.library.Plibrary.mapper.IplibraryMapper">
+
+  <!-- 개인 폴더 정보 INSERT -->
+    <insert id="PinsertFolder" parameterType="foldersVO">
+        <selectKey resultType="int" order="BEFORE" keyProperty="folderNo">
+            SELECT SEQ_FOLDER.NEXTVAL FROM DUAL
+        </selectKey>
+        INSERT INTO FOLDERS
+            (
+                FOLDER_NO,
+                UPPER_FOLDER,
+                EMP_NO,
+                FOLDER_NAME,
+                FOLDER_CRT_YMD,
+                FOLDER_TY,
+                DEPT_NO,
+                DEL_YN
+            )
+        VALUES
+            (
+                #{folderNo},
+                #{upperFolder},
+                #{empNo},
+                #{folderName},
+                TO_CHAR(SYSDATE, 'YYYYMMDD'),
+                #{folderTy},
+                #{deptNo},
+                #{delYn}
+            )
+    </insert>
+
+    <!-- 개인 파일 정보 INSERT -->
+    <insert id="PinsertFile" parameterType="folderFileVO">
+        <selectKey resultType="int" order="BEFORE" keyProperty="fileNo">
+            SELECT SEQ_FOLDER_FILE.NEXTVAL FROM DUAL
+        </selectKey>
+        INSERT INTO FOLDER_FILE
+            (
+                FILE_NO,
+                EMP_NO,
+                FOLDER_NO,
+                ORIGINAL_NM,
+                SAVED_NAME,
+                FILE_PATH,
+                FILE_SIZE,
+                FILE_FANCYSIZE,
+                FILE_MIME,
+                FILE_REG_DT,
+                DEL_YN
+            )
+        VALUES
+            (
+                #{fileNo},
+                #{empNo},
+                #{folderNo},
+                #{originalNm},
+                #{savedName},
+                #{filePath},
+                #{fileSize},
+                #{fileFancysize},
+                #{fileMime},
+                SYSDATE,
+                #{delYn}
+            )
+    </insert>
+    
+     <!-- 개인 폴더 목록 조회 -->
+    <select id="selectPfolderList" parameterType="map" resultType="foldersVO">
+	    	SELECT
+	    		FOLDER_NO,
+	    		UPPER_FOLDER,
+	    		EMP_NO,
+	    		FOLDER_NAME,
+	    		FOLDER_CRT_YMD,
+	    		FOLDER_MDFCN_YMD,
+	    		FOLDER_TY,
+	    		DEPT_NO,
+	    		DEL_YN
+	    	FROM FOLDERS
+	    	WHERE
+	    		EMP_NO = #{empNo}
+	    	<if test="searchType eq 'fileName'">
+	    		AND 1 = 0
+	        </if>
+	    	AND
+	    		FOLDER_TY = '10001'
+	    	
+   	    	<if test="searchType != 'folderName'">
+	    	AND
+	    		UPPER_FOLDER 
+		        <if test="upperFolder != null and upperFolder != 0">
+		            = #{upperFolder}
+		        </if>
+		        <if test="upperFolder == null or upperFolder == 0">
+		            IS NULL
+		        </if>
+	        </if>
+	        
+	    	AND
+	    		DEL_YN = 'N'
+	       <include refid="searchFolders" /> 		
+    </select>
+    
+    <!-- 개인 파일 목록 조회 -->
+    <select id="selectPfileList" parameterType="map" resultType="folderFileVO">
+	        SELECT
+	            FILE_NO,
+	            ff.EMP_NO,
+	            ff.FOLDER_NO,
+	            ORIGINAL_NM,
+	            SAVED_NAME,
+	            FILE_PATH,
+	            FILE_SIZE,
+	            FILE_FANCYSIZE,
+	            FILE_MIME,
+	            FILE_REG_DT,
+	            ff.DEL_YN
+	        FROM FOLDER_FILE ff
+	        INNER JOIN FOLDERS f on (f.folder_no = ff.folder_no)
+	        WHERE
+	            ff.EMP_NO = #{empNo}
+	        <if test="searchType eq 'folderName'">
+	        	AND 1 = 0
+	       </if> 
+	        AND 
+	            (f.folder_ty = '10001' OR ff.folder_no = 1)
+	        AND
+	            ff.DEL_YN = 'N'
+	       <if test="searchType != 'fileName'">
+	        AND 
+	        	ff.FOLDER_NO = #{folderNo} 
+	       </if> 
+
+	         <include refid="searchFiles" />     
+    </select>
+    
+    <!-- 특정 폴더 정보 조회 -->
+    <select id="selectFolder" parameterType="int" resultType="foldersVO">
+        SELECT
+            FOLDER_NO,
+            UPPER_FOLDER,
+            EMP_NO,
+            FOLDER_NAME,
+            FOLDER_CRT_YMD,
+            FOLDER_MDFCN_YMD,
+            FOLDER_TY,
+            DEPT_NO,
+            DEL_YN
+        FROM FOLDERS
+        WHERE
+            FOLDER_NO = #{folderNo}
+    </select>
+    
+    <!-- 파일 이동 -->
+    <update id="updateFileFolder" parameterType="map">
+    UPDATE FOLDER_FILE
+    SET
+        FOLDER_NO = #{targetFolderNo}
+    WHERE
+        FILE_NO = #{fileNo}
+</update>
+
+	<!-- 폴더 이동 -->
+	<update id="updateFolderParent" parameterType="map">
+	    UPDATE FOLDERS
+	    SET
+	        UPPER_FOLDER = #{targetFolderNo},
+	        FOLDER_MDFCN_YMD = TO_CHAR(SYSDATE, 'YYYYMMDD')
+	    WHERE
+	        FOLDER_NO = #{folderNo}
+	</update>
+	
+	<!-- 파일 다운로드 -->
+	<select id="selectFileByFileNo">
+	SELECT
+	    FILE_NO,
+	    EMP_NO,
+	    FOLDER_NO,
+	    ORIGINAL_NM,
+	    SAVED_NAME,
+	    FILE_PATH,
+	    FILE_SIZE,
+	    FILE_FANCYSIZE,
+	    FILE_MIME,
+	    FILE_REG_DT,
+	    DEL_YN
+	FROM FOLDER_FILE
+	WHERE
+	    FILE_NO = #{fileNo}
+	AND 
+	    DEL_YN = 'N'
+	</select>
+	
+ <!-- 폴더 삭제 -->
+ <update id="updateFolderDelYn" parameterType="map">
+    UPDATE FOLDERS
+    SET
+        DEL_YN = #{delYn}
+    WHERE
+        FOLDER_NO = #{folderNo}
+</update>
+ 
+ <!-- 특정 폴더,파일 삭제,복원 -->
+ <update id="updateFilesByFolderNo" parameterType="map">
+    UPDATE FOLDER_FILE
+    SET
+        DEL_YN = #{delYn}
+    WHERE
+        FOLDER_NO = #{folderNo}
+</update>
+
+<!-- 파일 삭제,복원 -->
+<update id="updateFileDelYn" parameterType="map">
+    UPDATE FOLDER_FILE
+    SET
+        DEL_YN = #{delYn}
+    WHERE
+        FILE_NO = #{fileNo}
+</update>
+
+<!-- 폴더 복원 -->
+<update id="updateFolderRestore" parameterType="map">
+    UPDATE FOLDERS
+    SET
+        DEL_YN = 'N'
+    WHERE
+        FOLDER_NO = #{folderNo}
+</update>
+
+<update id="updateFolderDelYnByFolderNo" parameterType="int">
+    UPDATE FOLDERS
+    SET
+        DEL_YN = 'Y'
+    WHERE
+        FOLDER_NO = #{folderNo}
+</update>
+
+
+<!-- 여기 추가해줭 -->
+<update id="updateFoldersDelYn" parameterType="map">
+    UPDATE FOLDERS
+       SET DEL_YN = #{delYn}
+     WHERE FOLDER_NO IN (
+            SELECT FOLDER_NO
+              FROM FOLDERS
+             START WITH FOLDER_NO = #{folderNo}
+             CONNECT BY PRIOR FOLDER_NO = UPPER_FOLDER
+          )
+</update>
+
+<update id="updateFolderFilesDelYn" parameterType="map">
+    UPDATE FOLDER_FILE
+       SET DEL_YN = #{delYn}
+     WHERE FOLDER_NO IN (
+            SELECT FOLDER_NO
+              FROM FOLDERS
+             START WITH FOLDER_NO = #{folderNo}
+             CONNECT BY PRIOR FOLDER_NO = UPPER_FOLDER
+          )
+</update>
+
+<!-- 휴지통 폴더 -->
+<select id="selectPyfolderList" parameterType="map" resultType="foldersVO">
+    SELECT
+        FOLDER_NO,
+        UPPER_FOLDER,
+        EMP_NO,
+        FOLDER_NAME,
+        FOLDER_CRT_YMD,
+        FOLDER_MDFCN_YMD,
+        FOLDER_TY,
+        DEPT_NO,
+        DEL_YN
+    FROM FOLDERS
+    WHERE
+        EMP_NO = #{empNo}
+    AND
+        FOLDER_TY = '10001'
+    AND
+        DEL_YN = 'Y'
+</select>
+
+<!-- 휴지통 파일 -->
+<select id="selectPyfileList" parameterType="map" resultType="folderFileVO">
+    SELECT
+        ff.FILE_NO,
+        ff.EMP_NO,
+        ff.FOLDER_NO,
+        ff.ORIGINAL_NM,
+        ff.SAVED_NAME,
+        ff.FILE_PATH,
+        ff.FILE_SIZE,
+        ff.FILE_FANCYSIZE,
+        ff.FILE_MIME,
+        ff.FILE_REG_DT,
+        ff.DEL_YN
+    FROM FOLDER_FILE ff
+    INNER JOIN FOLDERS f ON ff.FOLDER_NO = f.FOLDER_NO
+    WHERE
+        ff.EMP_NO = #{empNo}
+    AND
+        ff.DEL_YN = 'Y'
+</select>
+
+<!-- 검색 쿼리 -->
+<sql id="searchFiles">
+    <if test="searchType != null and searchWord != null and searchWord != ''">
+        <choose>
+            <when test="searchType eq 'fileName'">
+                AND SAVED_NAME LIKE '%' || #{searchWord} || '%'
+            </when>
+        </choose>
+    </if>
+</sql>
+
+<sql id="searchFolders">
+    <if test="searchType != null and searchWord != null and searchWord != ''">
+        <choose>
+            <when test="searchType eq 'folderName'">
+                AND FOLDER_NAME LIKE '%' || #{searchWord} || '%'
+            </when>
+        </choose>
+    </if>
+</sql>
+
+<!-- 개인 자료실 용량 사이즈 구하기 -->
+  <select id="selectTotalFileSize" parameterType="string" resultType="long">
+        SELECT SUM(FILE_SIZE) AS TOTAL_SIZE
+        FROM FOLDER_FILE
+        WHERE EMP_NO = #{empNo}
+        AND DEL_YN = 'N'
+    </select>
+    
+    	<!-- 파일 완전 삭제 -->	
+	<delete id="permanentlyDeleteFile" parameterType="int">
+    DELETE FROM FOLDER_FILE
+    WHERE FILE_NO = #{fileNo}
+</delete>
+	
+	<!-- 폴더 완전 삭제 -->
+	<delete id="permanentlyDeleteFolder" parameterType="int">
+    DELETE FROM FOLDERS
+    WHERE FOLDER_NO = #{folderNo}
+</delete>
+
+<!-- 하위 폴더 포함 모든 파일 삭제 -->
+<delete id="deleteFilesByFolderRecursively" parameterType="int">
+    DELETE FROM FOLDER_FILE
+    WHERE FOLDER_NO IN (
+        SELECT FOLDER_NO 
+        FROM FOLDERS
+        START WITH FOLDER_NO = #{folderNo}
+        CONNECT BY PRIOR FOLDER_NO = UPPER_FOLDER
+    )
+</delete>
+
+<!-- 하위 폴더 포함 모든 폴더 삭제 -->
+<delete id="deleteFoldersRecursively" parameterType="int">
+    DELETE FROM FOLDERS
+    WHERE FOLDER_NO IN (
+        SELECT FOLDER_NO 
+        FROM FOLDERS
+        START WITH FOLDER_NO = #{folderNo}
+        CONNECT BY PRIOR FOLDER_NO = UPPER_FOLDER
+    )
+</delete>
+</mapper>

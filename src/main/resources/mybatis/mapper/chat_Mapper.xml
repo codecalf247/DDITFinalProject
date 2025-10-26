@@ -1,0 +1,373 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.or.ddit.common.chatting.mapper.IChatMapper">
+
+
+	<resultMap type="kr.or.ddit.vo.EmpVO" id="empMap">
+		<id property="empNo" column="emp_no"/>
+		<result property="empNo" column="emp_no"/>
+		<result property="password" column="PASSWORD"/>
+		<result property="jbgdCd" column="JBGD_CD"/>
+		<result property="empNm" column="EMP_NM"/>
+		<result property="brdt" column="BRDT"/>
+		<result property="email" column="EMAIL"/>
+		<result property="wnmpyEmail" column="WNMPY_EMAIL"/>
+		<result property="telno" column="TELNO"/>
+		<result property="extNo" column="EXT_NO"/>
+		<result property="empZip" column="EMP_ZIP"/>
+		<result property="homeAddr" column="HOME_ADDR"/>
+		<result property="homeDaddr" column="HOME_DADDR"/>
+		<result property="jncmpYmd" column="JNCMP_YMD"/>
+		<result property="rsgntnYmd" column="RSGNTN_YMD"/>
+		<result property="bankCd" column="BANK_CD"/>
+		<result property="actno" column="ACTNO"/>
+		<result property="dpstrNm" column="DPSTR_NM"/>
+		<result property="salary" column="SALARY"/>
+		<result property="profileFilePath" column="PROFILE_FILE_PATH"/>
+		<result property="signFilePath" column="SIGN_FILE_PATH"/>
+		<result property="userFolderUsgqty" column="USER_FOLDER_USGQTY"/>
+		<result property="photoKey" column="PHOTO_KEY"/>
+		<result property="enabled" column="ENABLED"/>
+		<result property="upperDeptNo" column="upper_dept_no"/>
+		<result property="workTyNo" column="work_ty_no"/>
+		<result property="deptNm" column="dept_nm"/>
+		<collection property="authList" resultMap="authMap" />
+		<collection property="deptList" resultMap="deptmap"></collection>
+	</resultMap>
+	
+	<resultMap type="kr.or.ddit.vo.EmpAuthVO" id="authMap">
+		<result property="empNo" column="emp_no"/>
+		<result property="authNm" column="auth_nm"/>
+	</resultMap>
+	
+	<resultMap type="kr.or.ddit.vo.DeptVO" id="deptmap">
+		<result property="deptNo" column="DEPT_NO"/>
+		<result property="upperDeptNo" column="UPPER_DEPT_NO"/>
+		<result property="workTyNo" column="WORK_TY_NO"/>
+		<result property="deptNm" column="DEPT_NM"/>
+		<result property="deptCrtYmd" column="DEPT_CRT_YMD"/>
+	</resultMap>
+
+	<select id="getUsers" resultMap="empMap" parameterType="string">
+	
+			    select * from emp ep 
+	    inner join auth at on ep.emp_no = at.emp_no 
+	    inner join dept dp on ep.dept_no = dp.dept_no
+	    where ep.emp_no != #{empNo}
+		
+	</select>
+
+	<select id="getRooms" parameterType="hashmap" resultType="kr.or.ddit.vo.ChattingVO">
+		select * 
+		from chat_room
+		where 1=1
+		and chat_room_ty = 'P'
+		and ((emp_no = #{me} or chat_room_nm = #{me}) and (emp_no = #{empNo} or chat_room_nm = #{empNo}))
+	</select>
+
+	<insert id="createRoomP" parameterType="hashmap" useGeneratedKeys="true">
+		<selectKey order="BEFORE" keyProperty="chatRoomNo" resultType="int">
+			select seq_chat_room.nextval from dual
+		</selectKey>
+		
+		insert into chat_room (
+			CHAT_ROOM_NO
+			,EMP_NO
+			,CHAT_ROOM_NM
+			,CHAT_ROOM_CRT_YMD
+			,DEL_YN
+			,FILE_GROUP_NO
+			,CHAT_ROOM_TY
+		) values (
+			#{chatRoomNo}
+			,#{me}
+			,#{empNo}
+			,TO_CHAR(SYSDATE, 'YYYYMMDD')
+			,'N'
+			,#{fileGroupNo,jdbcType=NUMERIC}
+			,'P'
+		)
+		
+	</insert>
+
+
+
+	<insert id="saveMsg" parameterType="kr.or.ddit.vo.ChatMessageVO" useGeneratedKeys="true">
+		<selectKey keyProperty="chatMsgNo" order="BEFORE" resultType="int">
+		select seq_CHAT_MSG.nextval from dual
+		</selectKey>
+		insert into chat_msg
+		(
+		CHAT_MSG_NO
+		,MSG_CN
+		,MSG_WRT_DT
+		,MSG_TY
+		,FILE_GROUP_NO
+		,CHAT_ROOM_NO
+		,EMP_NO
+		)
+		values
+		(
+		#{chatMsgNo}
+		,#{msgCn}
+		,sysdate
+		,#{msgTy}
+		,#{fileGroupNo,jdbcType=NUMERIC}
+		,#{chatRoomNo}
+		,#{empNo}
+		)
+	</insert>
+
+	<insert id="insertMem" parameterType="hashmap">
+		insert into CHAT_ROOM_MEM (
+			CHAT_ROOM_NO
+			,EMP_NO
+			,JOIN_DT
+			,JOIN_YN
+			,LAST_MSG_NO
+		) values (
+			#{chatRoomNo}
+			,#{empNo}
+			,sysdate
+			,'Y'
+			,0
+		)
+	
+	</insert>
+
+	<select id="existsRoomMember" resultType="int">
+	  SELECT COUNT(*)
+	  FROM CHAT_ROOM_MEM
+	  WHERE CHAT_ROOM_NO = #{roomNo}
+	    AND EMP_NO = #{empNo}
+	    AND JOIN_YN = 'Y'
+	</select>
+
+	<select id="selectRoomMessages" parameterType="map"
+        resultType="kr.or.ddit.vo.ChatMessageVO">
+		  SELECT
+		    m.CHAT_MSG_NO   AS chatMsgNo,
+		    m.CHAT_ROOM_NO  AS chatRoomNo,
+		    m.EMP_NO        AS empNo,
+		    e.EMP_NM        AS empNm,    
+		    m.MSG_CN        AS msgCn,
+		    m.MSG_TY        AS msgTy,
+		    m.MSG_WRT_DT    AS msgWrtDt,
+
+    m.FILE_GROUP_NO AS fileGroupNo,
+
+    CASE WHEN f.FILE_NO IS NOT NULL THEN f.ORIGINAL_NM END                 AS fileNm,
+    CASE WHEN f.FILE_NO IS NOT NULL THEN f.FILE_SIZE    END                 AS fileSize,
+    CASE WHEN f.FILE_NO IS NOT NULL THEN f.FILE_MIME    END                 AS mimeType,
+    CASE WHEN f.FILE_NO IS NOT NULL THEN (f.FILE_PATH || '/' || f.SAVED_NM) END AS fileUrl,
+    CASE WHEN f.FILE_NO IS NOT NULL AND f.FILE_MIME LIKE 'image/%'
+         THEN (f.FILE_PATH || '/s_' || f.SAVED_NM)
+    END                                                                   AS thumbUrl,
+    CASE WHEN f.FILE_NO IS NOT NULL AND f.FILE_MIME LIKE 'image/%'
+         THEN 'Y' ELSE 'N'
+    END                                                                   AS imageYn
+  FROM CHAT_MSG m
+  LEFT JOIN EMP e   ON e.EMP_NO = m.EMP_NO
+  LEFT JOIN FILES f ON f.FILE_GROUP_NO = m.FILE_GROUP_NO   
+		  WHERE m.CHAT_ROOM_NO = #{roomNo}
+		  <if test="cursor != null">
+		    AND m.CHAT_MSG_NO &lt; #{cursor}
+		  </if>
+		  ORDER BY m.CHAT_MSG_NO DESC
+		  FETCH FIRST #{size} ROWS ONLY
+	</select>
+	
+	<select id="selectMyRooms" parameterType="string" resultType="kr.or.ddit.common.chatting.dto.ChatRoomListDTO">
+  <![CDATA[
+    SELECT
+      r.CHAT_ROOM_NO                            AS chatRoomNo,
+      r.CHAT_ROOM_TY                            AS chatRoomTy,
+
+      /* 제목 규칙:
+         - 참여자 2명(DM)이면: 상대 이름
+         - 그 외(그룹)이면: 참여자 전원의 이름 LISTAGG(본인 포함)  */
+      CASE
+        WHEN pi.member_cnt = 2 THEN e.EMP_NM
+        ELSE names_all.names
+      END                                        AS displayName,
+
+      m.MSG_CN                                   AS lastMsg,
+      m.MSG_WRT_DT                               AS lastMsgDt,
+      NVL(uc.UNREAD_CNT, 0)                      AS unreadCnt
+
+    FROM CHAT_ROOM r
+
+    /* 내가 참여 중인 방만 */
+    JOIN CHAT_ROOM_MEM my
+      ON my.CHAT_ROOM_NO = r.CHAT_ROOM_NO
+     AND my.EMP_NO       = #{empNo}
+     AND my.JOIN_YN      = 'Y'
+
+    /* 방별 마지막 메시지 */
+    LEFT JOIN (
+      SELECT CHAT_ROOM_NO, MAX(CHAT_MSG_NO) AS LAST_MSG_NO
+        FROM CHAT_MSG
+       GROUP BY CHAT_ROOM_NO
+    ) lm ON lm.CHAT_ROOM_NO = r.CHAT_ROOM_NO
+    LEFT JOIN CHAT_MSG m
+      ON m.CHAT_ROOM_NO = r.CHAT_ROOM_NO
+     AND m.CHAT_MSG_NO  = lm.LAST_MSG_NO
+
+    /* 안 읽은 개수 */
+    LEFT JOIN (
+      SELECT rm.CHAT_ROOM_NO, COUNT(1) AS UNREAD_CNT
+        FROM CHAT_ROOM_MEM rm
+        JOIN CHAT_MSG mm
+          ON mm.CHAT_ROOM_NO = rm.CHAT_ROOM_NO
+         AND mm.CHAT_MSG_NO  > NVL(rm.LAST_MSG_NO, 0)
+         AND mm.EMP_NO      != #{empNo}
+       WHERE rm.EMP_NO = #{empNo}
+       GROUP BY rm.CHAT_ROOM_NO
+    ) uc ON uc.CHAT_ROOM_NO = r.CHAT_ROOM_NO
+
+    /* 멤버 수/DM에서 상대 사번 */
+    LEFT JOIN (
+      SELECT rm.CHAT_ROOM_NO,
+             COUNT(1) AS member_cnt,
+             MAX(CASE WHEN rm.EMP_NO != #{empNo} THEN rm.EMP_NO END) AS partner_emp_no
+        FROM CHAT_ROOM_MEM rm
+       WHERE rm.JOIN_YN = 'Y'
+       GROUP BY rm.CHAT_ROOM_NO
+    ) pi ON pi.CHAT_ROOM_NO = r.CHAT_ROOM_NO
+
+    /* DM일 때 상대 사번 -> 이름 */
+    LEFT JOIN EMP e
+      ON e.EMP_NO = pi.partner_emp_no
+
+    /* 그룹 제목용: 참여자 전원 이름(본인 포함) 리스트업 */
+    LEFT JOIN (
+      SELECT rm.CHAT_ROOM_NO,
+             LISTAGG(e.EMP_NM, ', ')
+               WITHIN GROUP (ORDER BY e.EMP_NM) AS names
+        FROM CHAT_ROOM_MEM rm
+        JOIN EMP e ON e.EMP_NO = rm.EMP_NO
+       WHERE rm.JOIN_YN = 'Y'
+       GROUP BY rm.CHAT_ROOM_NO
+    ) names_all ON names_all.CHAT_ROOM_NO = r.CHAT_ROOM_NO
+
+    WHERE r.DEL_YN = 'N'
+    ORDER BY COALESCE(m.MSG_WRT_DT, DATE '1900-01-01') DESC
+  ]]>
+	</select>
+
+	<update id="updateLastRead" parameterType="map">
+	  UPDATE CHAT_ROOM_MEM                               <!-- 방-멤버 조인 테이블 -->
+	     SET LAST_MSG_NO = GREATEST(                     <!-- 기존 값과 새 값을 비교해서 더 큰 값 선택 -->
+	           NVL(LAST_MSG_NO, 0),                      <!-- 기존 LAST_MSG_NO가 null이면 0으로 간주 -->
+	           #{lastMsgNo}                              <!-- 이번에 '봤다'고 보고한 마지막 메시지 번호 -->
+	         )
+	   WHERE CHAT_ROOM_NO = #{roomNo}                    <!-- 대상 방 번호 -->
+	     AND EMP_NO       = #{empNo}                     <!-- 로그인 사용자(나)의 사번 -->
+	</update>
+
+
+	<insert id="createRoomG" parameterType="map">
+	  <selectKey order="BEFORE" keyProperty="chatRoomNo" resultType="int">
+	    SELECT seq_chat_room.NEXTVAL FROM dual
+	  </selectKey>
+	  INSERT INTO chat_room (
+	    CHAT_ROOM_NO, EMP_NO, CHAT_ROOM_NM, CHAT_ROOM_CRT_YMD, DEL_YN, FILE_GROUP_NO, CHAT_ROOM_TY
+	  ) VALUES (
+	    #{chatRoomNo}, #{ownerEmpNo}, #{roomNm}, TO_CHAR(SYSDATE, 'YYYYMMDD'), 'N', '', 'G'
+	  )
+	</insert>
+
+		<select id="selectTotalUnread" parameterType="string" resultType="int">
+		  SELECT COUNT(1)
+		    FROM CHAT_ROOM_MEM rm
+		    JOIN CHAT_MSG mm
+		      ON mm.CHAT_ROOM_NO = rm.CHAT_ROOM_NO
+		     AND mm.CHAT_MSG_NO  > NVL(rm.LAST_MSG_NO, 0)
+		     AND mm.EMP_NO      != #{empNo}
+		   WHERE rm.EMP_NO = #{empNo}
+		</select>
+
+		<select id="selectMembersOfRoom" parameterType="int" resultType="string">
+		  SELECT EMP_NO
+		    FROM CHAT_ROOM_MEM
+		   WHERE CHAT_ROOM_NO = #{roomNo}
+		     AND JOIN_YN = 'Y'
+		</select>
+		
+		
+		<select id="nextFileGroupNo" resultType="int">
+  SELECT SEQ_FILE_GROUP.NEXTVAL FROM DUAL
+</select>
+
+<select id="nextFileNo" resultType="int">
+  SELECT SEQ_FILE.NEXTVAL FROM DUAL
+</select>
+
+<insert id="insertFile" parameterType="kr.or.ddit.vo.FilesVO">
+  INSERT INTO files (
+    FILE_GROUP_NO, FILE_NO,
+    ORIGINAL_NM, FILE_UPLOADER,
+    SAVED_NM, FILE_PATH,
+    FILE_SIZE, FILE_FANCYSIZE, FILE_MIME,
+    FILE_REG_DT, DEL_YN
+  ) VALUES (
+    #{fileGroupNo}, #{fileNo},
+    #{originalNm}, #{fileUploader},
+    #{savedNm}, #{filePath},
+    NVL(#{fileSize},0), NVL(#{fileFancysize}, '0 B'), NVL(#{fileMime}, 'application/octet-stream'),
+    SYSDATE, NVL(#{delYn}, 'N')
+  )
+</insert>
+
+<select id="selectFileByGroup" resultType="kr.or.ddit.vo.FilesVO">
+  SELECT FILE_GROUP_NO AS fileGroupNo,
+         FILE_NO       AS fileNo,
+         ORIGINAL_NM   AS originalNm,
+         SAVED_NM      AS savedNm,
+         FILE_PATH     AS filePath,
+         FILE_SIZE     AS fileSize,
+         FILE_MIME     AS fileMime
+  FROM files
+  WHERE FILE_GROUP_NO = #{groupNo}
+</select>
+
+<update id="upsertMember">
+  MERGE INTO CHAT_ROOM_MEM m
+  USING (SELECT #{chatRoomNo} AS CHAT_ROOM_NO, #{empNo} AS EMP_NO FROM dual) s
+  ON (m.CHAT_ROOM_NO = s.CHAT_ROOM_NO AND m.EMP_NO = s.EMP_NO)
+  WHEN MATCHED THEN
+    UPDATE SET m.JOIN_YN = 'Y', m.JOIN_DT = SYSDATE
+  WHEN NOT MATCHED THEN
+    INSERT (CHAT_ROOM_NO, EMP_NO, JOIN_YN, JOIN_DT)
+    VALUES (s.CHAT_ROOM_NO, s.EMP_NO, 'Y', SYSDATE)
+</update>
+
+
+  <resultMap id="MeetingMsgMap" type="kr.or.ddit.common.chatting.dto.MeetingMsgRow">
+    <result column="chat_msg_no" property="msgNo"/>
+    <result column="msg_cn" property="msgCn"/>
+  </resultMap>
+
+  <!-- 방에서 가장 최근 회의시작(04001) 1건 -->
+  <select id="selectLastMeetingMsg" resultMap="MeetingMsgMap">
+    SELECT CHAT_MSG_NO, msg_cn
+      FROM CHAT_MSG
+     WHERE chat_room_no = #{chatRoomNo}
+       AND msg_ty = '04001'
+     ORDER BY CHAT_MSG_NO DESC
+     FETCH FIRST 1 ROWS ONLY
+  </select>
+
+  <!-- 해당 메시지의 본문을 JSON으로 덮어씀 -->
+  <select id="selectNextChatMsgNo" resultType="long">
+    SELECT SEQ_CHAT_MSG.NEXTVAL FROM DUAL
+  </select>
+
+<insert id="insertMeetingMsg">
+  INSERT INTO CHAT_MSG
+    (CHAT_MSG_NO, MSG_CN, MSG_WRT_DT, MSG_TY, FILE_GROUP_NO, CHAT_ROOM_NO, EMP_NO)
+  VALUES
+    (#{msgNo}, #{msgCn}, SYSDATE, '04001', NULL, #{roomNo}, #{empNo})
+</insert>
+
+</mapper>

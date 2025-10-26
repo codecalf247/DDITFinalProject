@@ -1,0 +1,1039 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.or.ddit.employee.eApproval.mapper.IeApprovalMapper">
+
+	<sql id="inProcessSearch">
+		<if test="searchWord != null and searchType == 'title'">
+			and (sd.sanctn_title like '%' || #{searchWord} || '%')
+		</if>
+		<if test="searchWord != null and searchType == 'docFormNm'">
+			and (sf.form_nm like '%' || #{searchWord} || '%')
+		</if>
+	</sql>
+
+	<sql id="inBoxSearch">
+		<if test="searchWord != null and searchType == 'title'">
+			and (sd.sanctn_title like '%' || #{searchWord} || '%')
+		</if>
+		<if test="searchWord != null and searchType == 'empNm'">
+			and (e.emp_nm like '%' || #{searchWord} || '%')
+		</if>
+	</sql>
+
+	<sql id="draftSearch">
+		<if test="searchWord != null and searchType == 'title'">
+			and (sanctn_title like '%' || #{searchWord} || '%')
+		</if>
+	</sql>
+	
+	<sql id="sanctnFormSearch">
+		<if test="searchWord != null and searchType == 'title'">
+			and (form_nm like '%' || #{searchWord} || '%')
+		</if>
+	</sql>
+	
+	<sql id="sanctnFormListSearch">
+		<if test="searchWord != null and searchType == 'title'">
+			and (sf.form_nm like '%' || #{searchWord} || '%') 
+		</if>
+	</sql>
+
+	<insert id="insertSaveLineEmp" parameterType="kr.or.ddit.vo.SanctnLineBkmkVO" useGeneratedKeys="true">
+		<selectKey order="BEFORE" keyProperty="bkmkNo" resultType="int">
+			select seq_sanctn_line_bkmk.nextval
+			from dual
+		</selectKey>
+		insert into sanctn_line_bkmk(
+			bkmk_no, emp_no, bkmk_nm, crt_ymd
+		)values(
+			#{bkmkNo}, #{empNo}, #{bkmkNm}, sysdate
+		)
+	</insert>
+	
+	<insert id="insertSaveLineEmpList">
+		insert into sanctn_line_bkmk_emp(
+			bkmk_no, emp_no, sanctn_ordr
+		)values(
+			#{bkmkNo}, #{empNo}, #{sanctnOrdr}
+		)
+	</insert>
+	
+	<select id="getSaveLineList" parameterType="String" resultType="kr.or.ddit.vo.SanctnLineBkmkVO">
+		select bkmk_no, bkmk_nm
+		from sanctn_line_bkmk
+		where emp_no = #{empNo}
+	</select>
+
+	<select id="getSaveLineEmp" parameterType="int" resultType="kr.or.ddit.vo.SanctnLineBkmkVO">
+		select e.emp_no, e.emp_nm, d.dept_nm, cd.cmmn_cd_nm as jbgd_nm, pe.emp_nm as proxyEmpNm
+		from emp e
+		inner join sanctn_line_bkmk_emp slbe on (slbe.bkmk_no = #{bkmkNo} and e.emp_no = slbe.emp_no )
+		inner join dept d on(d.dept_no = e.dept_no)
+		inner join cmmn_cd cd on (cd.cmmn_cd_id = e.jbgd_cd)
+		left join proxy_sanctner ps on (ps.emp_no = e.emp_no)
+		    and to_char(sysdate,'YYYYMMDD') between ps.begin_ymd and ps.end_ymd
+		left join emp pe on(pe.emp_no = ps.proxy_emp_no)
+		order by sanctn_ordr
+	</select>
+	
+	<!-- 전자결재 기안시 문서 정보 등록 -->
+	<insert id="insertSanctnDoc" parameterType="kr.or.ddit.vo.SanctnDocVO" useGeneratedKeys="true">
+		<selectKey keyProperty="sanctnDocNo" order="BEFORE" resultType="String">
+			select 'REQ' || to_char(sysdate, 'yymm') || 
+			       lpad( nvl(
+			             (select to_number(substr(max(sanctn_doc_no), 8)) + 1
+			              from sanctn_doc
+			             where sanctn_doc_no like 'REQ' || to_char(sysdate, 'yymm') || '%'), 1
+			         ), 3, '0') as sanctn_doc_no
+			from dual
+		</selectKey>
+		insert into sanctn_doc(
+			sanctn_doc_no, form_no, emp_no, wrt_dt, sanctn_title, sanctn_cn, sanctn_ty, 
+			doc_process_sttus, sanctn_opinion, last_atrz_dt, del_ty, emrgncy_yn, file_group_no
+		)values(
+			#{sanctnDocNo}, #{formNo}, #{empNo}, sysdate, #{sanctnTitle}, null, #{sanctnTy}, 
+			'09002', null, null, 'N', #{emrgncyYn}, null
+		)
+	</insert>
+	
+	<!-- 대결자 insert -->
+	<insert id="insertProxySanctner" parameterType="kr.or.ddit.vo.ProxySanctnerVO" useGeneratedKeys="true">
+		<selectKey keyProperty="proxySanctnerNo" order="BEFORE" resultType="int">
+			select seq_proxy_sanctner.nextval
+			from dual
+		</selectKey>
+		insert into proxy_sanctner(
+			proxy_sanctner_no, emp_no, proxy_emp_no, begin_ymd, end_ymd
+		)values(
+			#{proxySanctnerNo}, #{empNo}, #{proxyEmpNo}, #{beginYmd}, #{endYmd}
+		)
+	</insert>
+	
+	<!-- 대결자 지정 되어있으면 사원번호 가져오기 -->
+	<select id="getEmpNo" resultType="String" parameterType="String">
+		select emp_no
+		from proxy_sanctner
+		where emp_no = #{loginEmpNo}
+		and end_ymd >= to_char(trunc(sysdate),'yyyymmdd')
+	</select>
+	
+	<select id="getProxyInfo" parameterType="String" resultType="kr.or.ddit.vo.ProxySanctnerVO">
+		select ps.proxy_sanctner_no, ps.emp_no, ps.proxy_emp_no, ps.begin_ymd, ps.end_ymd, e.emp_nm as proxyNm, cc.cmmn_cd_nm as jbgdCd, d.dept_nm as deptNm
+		from proxy_sanctner ps
+		inner join emp e on(ps.proxy_emp_no = e.emp_no)
+		inner join cmmn_cd cc on(e.jbgd_cd = cc.cmmn_cd_id)
+		inner join dept d on(e.dept_no = d.dept_no)
+		where ps.emp_no = #{empNo}
+		and ps.end_ymd >= to_char(trunc(sysdate),'yyyymmdd')
+	</select>
+	
+	<delete id="deleteProxySanctner" parameterType="int">
+		delete from proxy_sanctner
+		where proxy_sanctner_no = #{proxySanctnerNo}
+	</delete>
+	
+	<select id="getProxySanctner" parameterType="String" resultType="kr.or.ddit.vo.ProxySanctnerVO">
+		select ps.proxy_emp_no, e.emp_nm as proxyNm, d.dept_nm as deptNm, cc.cmmn_cd_nm as jbgdCd
+		from proxy_sanctner ps 
+		inner join emp e on(ps.proxy_emp_no = e.emp_no)
+		inner join dept d on(e.dept_no = d.dept_no)
+		inner join cmmn_cd cc on(e.jbgd_cd = cc.cmmn_cd_id)
+		where ps.emp_no = #{empNo}
+		and ps.end_ymd >= to_char(trunc(sysdate),'yyyymmdd')
+	</select>
+	
+	<insert id="insertSanctner" parameterType="kr.or.ddit.vo.SanctnerVO" useGeneratedKeys="true">
+		<selectKey order="BEFORE" keyProperty="sanctnerNo" resultType="int">
+			select seq_sanctner.nextval
+			from dual		
+		</selectKey>
+		insert into sanctner(
+			sanctner_no, sanctn_doc_no, emp_no, last_sanctner, last_sanctner_jbgd, 
+			sanctn_ordr, sanctn_sttus, atrz_dt, sanctn_opinion, dcrb_auth_yn, sign_file_path
+		)values(
+			#{sanctnerNo}, #{sanctnDocNo}, #{empNo}, #{lastSanctner}, #{lastSanctnerJbgd},
+			#{sanctnOrdr}, 
+			case when #{sanctnOrdr} = 1 then '20002' else '20001' end, 
+			null, null, #{dcrbAuthYn}, null
+		)
+	</insert>
+	
+	<insert id="insertSanctnCC" parameterType="kr.or.ddit.vo.SanctnCCVO">
+		insert into sanctn_cc(
+			sanctn_doc_no, emp_no
+		)values(
+			#{sanctnDocNo}, #{empNo}
+		)
+	</insert>
+		
+	<!--	전자결재 양식 관련	  -->
+	<!-- 전자결재 양식 등록 -->
+	<insert id="approvalFormRegister" parameterType="kr.or.ddit.vo.SanctnFormVO" useGeneratedKeys="true">
+		<selectKey order="BEFORE" keyProperty="formNo" resultType="int">
+			select seq_form_no.nextval from dual
+		</selectKey>
+		insert into sanctn_form(
+			form_no, upper_form_no, form_nm, form_dc, form_cn, reg_ymd, mdfcn_ymd, is_folder
+		)values(
+			#{formNo}, #{upperFormNo}, #{formNm}, #{formDc}, #{formCn}, to_char(sysdate, 'YYYYMMDD'), null, 'N'
+		)
+	</insert>
+	
+	<select id="getApprovalFolderList" parameterType="kr.or.ddit.vo.PaginationInfoVO" resultType="kr.or.ddit.vo.SanctnFormVO">
+		select form_no, upper_form_no, form_nm, form_dc, form_cn, reg_ymd, mdfcn_ymd, is_folder
+		from sanctn_form
+		where upper_form_no is null
+		and is_folder = 'Y'
+		<include refid="sanctnFormSearch"/>
+	</select>
+	
+	<!-- 전자결재 양식 form 가져오기 -->
+	<select id="getApprovalFolderListCnt" parameterType="kr.or.ddit.vo.PaginationInfoVO" resultType="int">
+		select count(*)
+		from sanctn_form
+		where upper_form_no is null
+		and is_folder = 'Y'
+		<include refid="sanctnFormSearch"/>
+	</select>
+	
+	<select id="getApprovalFormList" parameterType="kr.or.ddit.vo.PaginationInfoVO" resultType="kr.or.ddit.vo.SanctnFormVO">
+		select sf.form_no, sf.upper_form_no, sf.form_nm, sf.form_dc, sf.form_cn, sf.reg_ymd, 
+				sf.mdfcn_ymd, sf.is_folder, s.form_nm as upper_form_nm
+		from sanctn_form sf
+        inner join sanctn_form s on(sf.upper_form_no = s.form_no)
+		where sf.upper_form_no is not null
+		and sf.is_folder = 'N'
+		and sf.upper_form_no = #{formNo}
+		<include refid="sanctnFormListSearch" />
+	</select>
+	
+	<select id="getApprovalFormListCnt" parameterType="kr.or.ddit.vo.PaginationInfoVO" resultType="int">
+		select count(*)
+		from sanctn_form
+		where upper_form_no is not null
+		and is_folder = 'N'
+		and upper_form_no = #{formNo}
+		<include refid="sanctnFormSearch" />
+	</select>
+	
+	<!-- 전자결재 상위 폴더 등록 -->
+	<insert id="insertApprovalFolder" parameterType="kr.or.ddit.vo.SanctnFormVO" useGeneratedKeys="true">
+		<selectKey order="BEFORE" keyProperty="formNo" resultType="int">
+			select seq_form_no.nextval from dual
+		</selectKey>
+		insert into sanctn_form(
+			form_no, upper_form_no, form_nm, form_dc, form_cn, reg_ymd, mdfcn_ymd, is_folder
+		)values(
+			#{formNo}, null, #{formNm}, #{formDc}, null, to_char(sysdate,'YYYYMMDD'), null, 'Y'
+		)
+	</insert>
+	
+	<!-- 전자결재 상위 폴더 정보 가져오기 -->
+	<select id="getFolderInfo" parameterType="int" resultType="kr.or.ddit.vo.SanctnFormVO">
+		select form_no, form_nm, form_dc
+		from sanctn_form
+		where form_no = #{formNo}
+	</select>
+	
+	<!-- 전자결재 상위 폴더 수정 -->
+	<update id="folderModify" parameterType="kr.or.ddit.vo.SanctnFormVO">
+		update sanctn_form
+		set 
+			form_nm = #{formNm},
+			form_dc = #{formDc},
+			mdfcn_ymd = to_char(sysdate, 'YYYYMMDD')
+		where form_no = #{formNo}
+	</update>
+	
+	<!-- 전자결재 상위 폴더 삭제 -->
+	<delete id="folderDelete" parameterType="int">
+		delete from sanctn_form
+		where form_no = #{formNo}
+	</delete>
+	
+	<!-- 전자결재 상위 폴더 내 하위 문서 있나 확인 -->
+	<select id="isFolderDoc" parameterType="int" resultType="kr.or.ddit.vo.SanctnFormVO">
+		select form_no, upper_form_no, form_nm, form_dc, form_cn, reg_ymd, mdfcn_ymd, is_folder
+		from sanctn_form
+		where upper_form_no = #{formNo}
+	</select>
+	
+	<!-- 전자결재 하위 폴더 강제 삭제 -->
+	<delete id="folderDocDelete" parameterType="int">
+		delete from sanctn_form
+		where form_no = #{docFormNo}
+	</delete>
+	
+	<!-- 전자결재 상세정보 가져오기 -->
+	<select id="getApprovalFormDetail" parameterType="int" resultType="kr.or.ddit.vo.SanctnFormVO">
+		select s.form_no, s.upper_form_no, s.form_nm, s.form_dc, s.form_cn, s.reg_ymd, s.mdfcn_ymd, s.is_folder, sf.form_nm as upper_form_nm
+		from sanctn_form s
+		inner join sanctn_form sf on(s.upper_form_no = sf.form_no)
+		where s.form_no = #{formNo}
+	</select>
+	
+	<!-- 전자결재 상세정보 수정 -->
+	<update id="docDetailModify" parameterType="kr.or.ddit.vo.SanctnFormVO">
+		update sanctn_form
+		set upper_form_no = #{upperFormNo},
+			form_nm = #{formNm},
+			form_dc = #{formDc},
+			form_cn = #{formCn},
+			mdfcn_ymd = to_char(sysdate, 'YYYYMMDD')
+		where form_no = #{formNo}
+	</update>
+	
+	<resultMap type="kr.or.ddit.vo.SanctnDocVO" id="approvalDocMap">
+	    <id property="sanctnDocNo" column="sanctn_doc_no"/>
+	    <result property="formNo" column="form_no"/>
+	    <result property="empNo" column="emp_no"/>
+	    <result property="wrtDt" column="wrt_dt"/>
+	    <result property="sanctnTitle" column="sanctn_title"/>
+	    <result property="sanctnCn" column="sanctn_cn"/>
+	    <result property="sanctnTy" column="sanctn_ty"/>
+	    <result property="docProcessSttus" column="doc_process_sttus"/>
+	    <result property="sanctnOpinion" column="sanctn_opinion"/>
+	    <result property="lastAtrzDt" column="last_atrz_dt"/>
+	    <result property="delTy" column="del_ty"/>
+	    <result property="emrgncyYn" column="emrgncy_yn"/>
+	    <result property="fileGroupNo" column="file_group_no"/>
+	    <result property="empNm" column="empNm"/>
+	    <result property="deptNm" column="deptNm"/>
+	    <result property="jbgdCd" column="jbgd_cd"/>
+	    <result property="formNm" column="formNm"/>
+	    <result property="formCn" column="formCn"/>
+	    <result property="formDc" column="formDc"/>
+	
+	    <!-- 첨부파일 리스트 매핑 -->
+	    <collection property="fileList" resultMap="approvalDocFileMap"/>
+	</resultMap>
+	
+	<resultMap type="kr.or.ddit.vo.FilesVO" id="approvalDocFileMap">
+		<result property="originalNm" column="originalNm"/>
+		<result property="savedNm" column="savedNm"/>
+		<result property="fileNo" column="fileNo"/>
+	</resultMap>
+	
+	<!-- 결재 기안시 결재정보 가져오기 -->
+	<select id="getApprovalDocInfo" parameterType="String" resultMap="approvalDocMap">
+		select sd.sanctn_doc_no, sd.form_no, sd.emp_no, sd.wrt_dt, sd.sanctn_title, sd.sanctn_cn, sd.sanctn_ty, 
+				sd.doc_process_sttus, sd.sanctn_opinion, sd.last_atrz_dt, sd.del_ty, sd.emrgncy_yn, sd.file_group_no,
+				e.emp_nm as empNm, d.dept_nm as deptNm, cc.cmmn_cd_nm as jbgd_cd, sf.form_nm as formNm, sf.form_cn as formCn,
+				f.original_nm as originalNm, f.saved_nm as savedNm, sf.form_dc as formDc, f.file_no as fileNo
+		from sanctn_doc sd
+		inner join emp e on(sd.emp_no = e.emp_no)
+		inner join dept d on(e.dept_no = d.dept_no)
+		inner join cmmn_cd cc on(e.jbgd_cd = cc.cmmn_cd_id)
+		inner join sanctn_form sf on(sd.form_no = sf.form_no)
+		left join files f on(sd.file_group_no = f.file_group_no)
+		where sanctn_doc_no = #{sanctnDocNo}
+	</select>
+	
+	<!-- 결재 기안시 결재자 가져오기 -->
+	<select id="getApprovalSanctnerList" parameterType="String" resultType="kr.or.ddit.vo.SanctnerVO">
+		select s.sanctner_no, s.sanctn_doc_no, s.emp_no, s.last_sanctner, s.last_sanctner_jbgd, s.sanctn_ordr, s.sanctn_sttus, 
+		        s.atrz_dt, s.sanctn_opinion, s.dcrb_auth_yn, e.sign_file_path, d.dept_nm as deptNm, e.emp_nm as empNm, 
+		        cc.cmmn_cd_nm as jbgdCd
+		from sanctner s
+		inner join emp e on(e.emp_no =  s.last_sanctner)
+		inner join dept d on(e.dept_no = d.dept_no)
+		inner join cmmn_cd cc on(e.jbgd_cd = cc.cmmn_cd_id)
+		where s.sanctn_doc_no = #{sanctnDocNo}
+		order by s.sanctn_ordr
+	</select>
+	
+	<!-- 결재선 가져오기 -->
+	<select id="getApprovalReSubmitSanctnerList" parameterType="String" resultType="kr.or.ddit.vo.SanctnerVO">
+		select s.sanctner_no, s.sanctn_doc_no, s.emp_no, s.last_sanctner, s.last_sanctner_jbgd, s.sanctn_ordr, 
+			    s.sanctn_sttus, s.atrz_dt, s.sanctn_opinion, s.dcrb_auth_yn, e.sign_file_path,  d.dept_nm as deptNm, 
+			    e.emp_nm as empNm, cc.cmmn_cd_nm as jbgdCd,
+			    case 
+			        when ep.emp_nm is null then '-'      
+			        else ep.emp_nm                      
+			    end as proxyEmpNm
+		from sanctner s
+		inner join emp e on (e.emp_no = s.emp_no)
+		inner join dept d on (e.dept_no = d.dept_no)
+		inner join cmmn_cd cc on (e.jbgd_cd = cc.cmmn_cd_id)
+		left join proxy_sanctner ps on (ps.EMP_NO = s.emp_no and trunc(sysdate) between ps.begin_ymd and ps.end_ymd) 
+		left join emp ep on (ep.emp_no = ps.proxy_emp_no)
+		where s.sanctn_doc_no = #{sanctnDocNo}
+	</select>
+	
+	<!-- 결재 기안시 참조자 가져오기 -->
+	<select id="getApprovalSanctnerCCList" parameterType="String" resultType="kr.or.ddit.vo.SanctnCCVO">
+		select sc.sanctn_doc_no, sc.emp_no, d.dept_nm as deptNm, cc.cmmn_cd_nm as jbgd_cd, e.emp_nm as empNm
+		from sanctn_cc sc
+		inner join emp e on(sc.emp_no = e.emp_no)
+		inner join dept d on(e.dept_no = d.dept_no)
+		inner join cmmn_cd cc on(e.jbgd_cd = cc.cmmn_cd_id)
+		where sanctn_doc_no = #{sanctnDocNo}
+	</select>
+	
+	<!-- 전자결재 기안 -->
+	<update id="approvalDocRegister" parameterType="kr.or.ddit.vo.SanctnDocVO">
+		update sanctn_doc
+		set sanctn_title = #{sanctnTitle},
+			sanctn_cn = #{sanctnCn},        
+			doc_process_sttus = #{docProcessSttus},
+			wrt_dt = sysdate
+			<if test="fileGroupNo > 0">
+				,file_group_no = case when #{fileGroupNo} = 0 then null else #{fileGroupNo} end
+			</if>
+		where sanctn_doc_no = #{sanctnDocNo}
+	</update>
+	
+	<!-- 전자결재 파일 그룹번호 생성 -->
+	<select id="getFileGroupNo" resultType="int">
+		select seq_file_group.nextval from dual
+	</select>
+	
+	<!-- 전자결재 파일 등록 -->
+	<insert id="approvalFileRegister" parameterType="kr.or.ddit.vo.FilesVO" useGeneratedKeys="true">
+		<selectKey keyProperty="fileNo" resultType="int" order="BEFORE">
+			select seq_file.nextval from dual
+		</selectKey>
+		insert into files(
+			file_group_no, file_no, original_nm, file_uploader, saved_nm, 
+			file_path, file_size, file_fancysize, file_mime, file_reg_dt, del_yn
+		)values(
+			#{fileGroupNo}, #{fileNo}, #{originalNm}, #{fileUploader}, #{savedNm},
+			#{filePath}, #{fileSize}, #{fileFancysize}, #{fileMime}, sysdate, 'N'
+		)
+	</insert>
+	
+	<!-- 전자결재 날인 삭제 -->
+	<update id="deleteStamp" parameterType="String">
+		update emp
+		set sign_file_path = null
+		where emp_no = #{empNo}
+	</update>
+	
+	<!-- 전자결재 날인 등록 -->
+	<update id="insertStamp" parameterType="kr.or.ddit.vo.EmpVO">
+		update emp
+		set sign_file_path = #{signFilePath}
+		where emp_no = #{empNo}
+	</update>
+	
+	<!-- 전자결재 날인 정보 가져오기 -->
+	<select id="getStampFilePath" parameterType="String" resultType="String">
+		select sign_file_path
+		from emp
+		where emp_no = #{empNo}
+	</select>
+	
+	<!-- 전자결재 상신 진행함 목록 가져오기 -->
+	<select id="getApprovalInProcess" parameterType="kr.or.ddit.vo.PaginationInfoVO" resultType="kr.or.ddit.vo.SanctnDocVO">
+		select b.*
+		from(
+			select a.*, row_number() over (
+	               order by 
+                   case when a.emrgncy_yn = 'Y' then 1 else 0 end desc,
+                   a.sanctn_doc_no desc
+			) rnum
+			from (
+				select sd.sanctn_doc_no, sd.form_no, sd.emp_no, sd.wrt_dt, sd.sanctn_title, sd.sanctn_cn, sd.sanctn_ty, 
+						sd.doc_process_sttus, sd.sanctn_opinion, sd.last_atrz_dt, sd.del_ty, sd.emrgncy_yn, sd.file_group_no, 
+						e.emp_nm as empNm, d.dept_nm as deptNm, sf.form_nm as formNm,
+						case when exists (
+			              select 1 
+			              from files f 
+			              where f.file_group_no = sd.file_group_no
+		              	) then 'Y' else 'N' end as hasFile
+				from sanctn_doc sd
+				left join emp e on(sd.emp_no = e.emp_no)
+				left join dept d on(e.dept_no = d.dept_no)
+				left join sanctn_form sf on(sf.form_no = sd.form_no) 
+				where sd.emp_no = #{empNo}
+				and sd.doc_process_sttus = '09002'
+				<include refid="inProcessSearch"/>
+			) a
+		)b
+		<![CDATA[
+			where b.rnum >= #{startRow} and b.rnum <= #{endRow}
+		]]>
+	</select>
+	
+	<!-- 전자결재 상신 진행함 건수 가져오기 -->
+	<select id="getApprovalInProcessCnt" parameterType="kr.or.ddit.vo.PaginationInfoVO" resultType="int">
+		select count(*)
+		from sanctn_doc sd
+		where sd.emp_no = #{empNo}
+		and sd.doc_process_sttus = '09002'
+		<include refid="inProcessSearch"/>
+	</select>
+	
+	<!-- 전자결재 기안자 회수 -->
+	<update id="deleteApprovalDoc" parameterType="String">
+		update sanctn_doc
+		set doc_process_sttus = '09001'
+		where sanctn_doc_no = #{sanctnDocNo}
+	</update>
+	
+	<!-- 전자결재 취소시 삭제 -->
+	<delete id="deleteDoc" parameterType="String">
+		delete from sanctn_doc
+		where sanctn_doc_no = #{sanctnDocNo}
+	</delete>
+	
+	<!-- 전자결재 취소시 결재자, 참조자 삭제 -->
+	<delete id="deleteSanctner" parameterType="String">
+		delete from sanctner
+		where sanctn_doc_no = #{sanctnDocNo}
+	</delete>
+	<delete id="deleteSanctnerCC" parameterType="String">
+		delete from sanctn_cc 
+		where sanctn_doc_no = #{sanctnDocNo}
+	</delete>
+	
+	<!-- 전자결재 수신결재함 정보 가져오기 -->
+	<select id="getInboxList" parameterType="kr.or.ddit.vo.PaginationInfoVO" resultType="kr.or.ddit.vo.SanctnDocVO">
+		select b.*
+		from(
+			select a.*, row_number() over (
+					order by 
+				    case when a.emrgncy_yn = 'Y' then 1 else 0 end desc,
+				    a.sanctn_doc_no desc
+			) rnum
+			from (
+				select sd.sanctn_doc_no, sd.form_no, sd.emp_no, sd.wrt_dt, sd.sanctn_title, sd.sanctn_cn, sd.sanctn_ty, 
+				        sd.doc_process_sttus, sd.sanctn_opinion, sd.last_atrz_dt, sd.del_ty, sd.emrgncy_yn, sd.file_group_no, 
+				        e.emp_nm as empNm, d.dept_nm as deptNm, s.sanctn_sttus,
+				        case when exists (
+			              select 1 
+			              from files f 
+			              where f.file_group_no = sd.file_group_no
+		                ) then 'Y' else 'N' end as hasFile
+				from sanctn_doc sd
+				inner join emp e on(sd.emp_no = e.emp_no)
+				inner join dept d on(e.dept_no = d.dept_no)
+				inner join sanctner s on(sd.sanctn_doc_no = s.sanctn_doc_no)
+				where (
+					s.last_sanctner = #{empNo}
+				    or exists (
+				        select 1
+				        from proxy_sanctner ps
+				        where ps.emp_no = s.last_sanctner
+				          and ps.proxy_emp_no = #{empNo}
+				          and sysdate between to_date(ps.begin_ymd, 'YYYYMMDD')
+				                          and to_date(ps.end_ymd, 'YYYYMMDD')
+				    )
+				)
+				and s.sanctn_sttus = '20002'
+				and sd.doc_process_sttus = '09002'
+				<include refid="inBoxSearch"/>
+			) a
+		)b
+		<![CDATA[
+			where b.rnum >= #{startRow} and b.rnum <= #{endRow}
+		]]>
+	</select>
+	
+	<!-- 전자결재 수신함 건수 가져오기 -->
+	<select id="getInboxCnt" parameterType="kr.or.ddit.vo.PaginationInfoVO" resultType="int">
+		select count(*)
+		from sanctner s
+		inner join sanctn_doc sd on(sd.sanctn_doc_no = s.sanctn_doc_no)
+		inner join emp e on(sd.emp_no = e.emp_no)
+		where s.last_sanctner = #{empNo}
+		and s.sanctn_sttus = '20002'
+		and sd.doc_process_sttus = '09002'
+		<include refid="inBoxSearch"/>
+	</select>
+	
+	<!-- 전자결재 승인/반려/전결 버튼 -->
+	<update id="approvalDocTyMof" parameterType="kr.or.ddit.vo.SanctnerVO">
+		update sanctner
+		set 
+			sanctn_sttus = #{sanctnSttus},
+			atrz_dt = sysdate,
+			sign_file_path = #{signFilePath},
+			sanctn_opinion = #{sanctnOpinion}
+		where last_sanctner = #{lastSanctner}
+		and sanctn_doc_no = #{sanctnDocNo}
+	</update>
+	
+	<!-- 현재 로그인한 사원의 날인 파일 경로 가져오기 -->
+	<select id="getSanctnerSignFilePath" parameterType="String" resultType="String">
+		select sign_file_path
+		from emp
+		where emp_no = #{empNo}
+	</select>
+	
+	<!-- 전자결재 앞사람 승인시 그 다음 사람 sttus 20002로 변경해주기 -->
+	<update id="approvalOrdrUpd" parameterType="kr.or.ddit.vo.SanctnerVO">
+		update sanctner
+		set sanctn_sttus = '20002'
+		where sanctn_doc_no = #{sanctnDocNo}
+		and sanctn_ordr = (
+			select min(sanctn_ordr)
+			from sanctner
+			where sanctn_doc_no = #{sanctnDocNo}
+			and sanctn_ordr > (
+				select sanctn_ordr
+				from sanctner
+				where sanctn_doc_no = #{sanctnDocNo}
+				and last_sanctner = #{lastSanctner}
+			)
+		)
+	</update>
+	
+	<!-- 마지막 결재자면 결재문서 진행상태 완료로 변경 -->
+	<update id="approvalDocProcessStatusUpd" parameterType="kr.or.ddit.vo.SanctnerVO">
+		update sanctn_doc
+		set doc_process_sttus = 
+		    case 
+		        when #{sanctnSttus} in ('20003','20004','20005') then '09003'
+		        when #{sanctnSttus} = '20007' then '09004'
+		    end,
+		 	last_atrz_dt = sysdate
+		where sanctn_doc_no = #{sanctnDocNo}
+	</update>
+	
+	<!-- 결재내역 cnt 가져오기 -->
+	<select id="getHistoryCnt" parameterType="kr.or.ddit.vo.PaginationInfoVO" resultType="int">
+		select count(*)
+		from sanctner s
+		inner join sanctn_doc sd on(s.sanctn_doc_no = sd.sanctn_doc_no)
+		inner join emp e on(e.emp_no = sd.emp_no)
+		where (s.sanctn_sttus = '20003'
+			or s.sanctn_sttus = '20004'
+			or s.sanctn_sttus = '20005'
+			or s.sanctn_sttus = '20007')
+		and s.last_sanctner = #{empNo}
+		<include refid="inBoxSearch"/>
+	</select>
+	
+	<!-- 전자결재 결재내역 가져오기 -->
+	<select id="getHistoryList" parameterType="kr.or.ddit.vo.PaginationInfoVO" resultType="kr.or.ddit.vo.SanctnDocVO">
+		select b.*
+		from(
+			select a.*, row_number() over (order by a.sanctn_doc_no desc) rnum
+			from (
+				select sd.sanctn_doc_no, sd.form_no, sd.emp_no, sd.wrt_dt, sd.sanctn_title, sd.sanctn_cn, sd.sanctn_ty, 
+				        sd.doc_process_sttus, sd.sanctn_opinion, sd.last_atrz_dt, sd.del_ty, sd.emrgncy_yn, sd.file_group_no, 
+				        e.emp_nm as empNm, d.dept_nm as deptNm, s.sanctn_sttus as sanctnSttus,
+                       case when exists (
+			              select 1 
+			              from files f 
+			              where f.file_group_no = sd.file_group_no
+		               ) then 'Y' else 'N' end as hasFile
+				from sanctn_doc sd
+				inner join emp e on(sd.emp_no = e.emp_no)
+				inner join dept d on(e.dept_no = d.dept_no)
+				inner join sanctner s on(sd.sanctn_doc_no = s.sanctn_doc_no)
+				where s.last_sanctner = #{empNo}
+				and (s.sanctn_sttus = '20003'
+				  or s.sanctn_sttus = '20004'
+				  or s.sanctn_sttus = '20005'
+				  or s.sanctn_sttus = '20007')
+				<include refid="inBoxSearch"/>
+				order by sd.sanctn_doc_no desc
+			) a
+		)b
+		<![CDATA[
+			where b.rnum >= #{startRow} and b.rnum <= #{endRow}
+		]]>
+	</select>
+	
+	<!-- 임시저장 건수 가져오기 -->
+	<select id="getDraftDocCnt" parameterType="kr.or.ddit.vo.PaginationInfoVO" resultType="int">
+		select count(*)
+		from sanctn_doc
+		where emp_no = #{empNo}
+		and doc_process_sttus = '09005'
+		and del_ty = 'N'
+		<include refid="draftSearch"/>
+	</select>
+	
+	<!-- 임시저장 List 가져오기 -->
+	<select id="getDraftDoc" parameterType="kr.or.ddit.vo.PaginationInfoVO" resultType="kr.or.ddit.vo.SanctnDocVO">
+		select b.*
+		from(
+		    select a.*, row_number() over (order by a.sanctn_doc_no desc) as rnum
+		    from (
+		        select sd.sanctn_doc_no, sd.form_no, sd.emp_no, sd.wrt_dt, sd.sanctn_title, sd.sanctn_cn, sd.sanctn_ty, 
+		               sd.doc_process_sttus, sd.sanctn_opinion, sd.last_atrz_dt, sd.del_ty, sd.emrgncy_yn, sd.file_group_no, 
+		               e.emp_nm as empNm, d.dept_nm as deptNm,
+                       case when exists (
+			              select 1 
+			              from files f 
+			              where f.file_group_no = sd.file_group_no
+		               ) then 'Y' else 'N' end as hasFile
+		        from sanctn_doc sd
+		        inner join emp e on (sd.emp_no = e.emp_no)
+		        inner join dept d on (e.dept_no = d.dept_no)
+		        where sd.emp_no = #{empNo}
+		          and sd.doc_process_sttus = '09005'
+		          and sd.del_ty = 'N'
+				<include refid="draftSearch"/>
+			) a
+		)b
+		<![CDATA[
+			where b.rnum >= #{startRow} and b.rnum <= #{endRow}
+		]]>
+	</select>
+	
+	<!-- delTy 가져오기 -->
+	<select id="getSanctnDocDelYn" parameterType="String" resultType="String">
+		select del_ty
+		from sanctn_doc
+		where sanctn_doc_no = #{sanctnDocNo}
+	</select>
+	
+	<!-- 임시저장 삭제(휴지통) -->
+	<update id="draftApprovalDocDel" parameterType="String">
+		update sanctn_doc
+		set del_ty = 'D'
+		where sanctn_doc_no = #{sanctnDocNo}
+	</update>
+	
+	<!-- 휴지통에서 삭제 -->
+	<update id="finalTrashApprovalDocDel" parameterType="String">
+		update sanctn_doc
+		set del_ty = 'L'
+		where sanctn_doc_no = #{sanctnDocNo}
+	</update>
+	
+	<!-- 휴지통 건수 가져오기 -->
+	<select id="getTrashDocCnt" parameterType="kr.or.ddit.vo.PaginationInfoVO" resultType="int">
+		select count(*)
+		from sanctn_doc
+		where emp_no = #{empNo}
+		and del_ty = 'D'
+		<include refid="draftSearch"/>
+	</select>
+	
+	<!-- 휴지통 List 가져오기 -->
+	<select id="getTrashList" parameterType="kr.or.ddit.vo.PaginationInfoVO" resultType="kr.or.ddit.vo.SanctnDocVO">
+		select b.*
+		from(
+		    select a.*, row_number() over (order by a.sanctn_doc_no desc) as rnum
+		    from (
+		        select sd.sanctn_doc_no, sd.form_no, sd.emp_no, sd.wrt_dt, sd.sanctn_title, sd.sanctn_cn, sd.sanctn_ty, 
+		               sd.doc_process_sttus, sd.sanctn_opinion, sd.last_atrz_dt, sd.del_ty, sd.emrgncy_yn, sd.file_group_no, 
+		               e.emp_nm as empNm, d.dept_nm as deptNm,
+                       case when exists (
+			              select 1 
+			              from files f 
+			              where f.file_group_no = sd.file_group_no
+		               ) then 'Y' else 'N' end as hasFile
+		        from sanctn_doc sd
+		        inner join emp e on (sd.emp_no = e.emp_no)
+		        inner join dept d on (e.dept_no = d.dept_no)
+		        where sd.emp_no = #{empNo}
+		          and (sd.doc_process_sttus = '09005' or sd.doc_process_sttus = '09001')
+		          and sd.del_ty = 'D'
+				<include refid="draftSearch"/>
+			) a
+		)b
+		<![CDATA[
+			where b.rnum >= #{startRow} and b.rnum <= #{endRow}
+		]]>
+	</select>
+	
+	<!-- 결재 휴지통에서 복원시 -->
+	<update id="restoreDoc" parameterType="String">
+		update sanctn_doc
+		set del_ty = 'N',
+			doc_process_sttus = '09001'
+		where sanctn_doc_no = #{sanctnDocNo}
+	</update>
+	
+	<!-- 결재 대기중 건수 -->
+	<select id="getPendingCnt" parameterType="kr.or.ddit.vo.PaginationInfoVO" resultType="int">
+		select count(*)
+		from sanctn_doc
+		where emp_no = #{empNo}
+		and doc_process_sttus = '09001'
+		and del_ty = 'N'
+		<include refid="draftSearch"/>
+	</select>
+	
+	<!-- 결재 대기중 List -->
+	<select id="getPendingList" parameterType="kr.or.ddit.vo.PaginationInfoVO" resultType="kr.or.ddit.vo.SanctnDocVO">
+		select b.*
+		from(
+		    select a.*, row_number() over (order by a.sanctn_doc_no desc) as rnum
+		    from (
+		        select sd.sanctn_doc_no, sd.form_no, sd.emp_no, sd.wrt_dt, sd.sanctn_title, sd.sanctn_cn, sd.sanctn_ty, 
+		               sd.doc_process_sttus, sd.sanctn_opinion, sd.last_atrz_dt, sd.del_ty, sd.emrgncy_yn, sd.file_group_no, 
+		               e.emp_nm as empNm, d.dept_nm as deptNm,        
+		               (select max(s.sanctn_sttus)
+				        from sanctner s
+				        where s.sanctn_doc_no = sd.sanctn_doc_no) as sanctnSttus,
+				       case when exists (
+				          select 1 
+				          from files f 
+				          where f.file_group_no = sd.file_group_no
+				       ) then 'Y' else 'N' end as hasFile
+		        from sanctn_doc sd
+		        inner join emp e on (sd.emp_no = e.emp_no)
+		        inner join dept d on (e.dept_no = d.dept_no)
+		        where sd.emp_no = #{empNo}
+		          and sd.doc_process_sttus = '09001'
+		          and sd.del_ty = 'N'
+				<include refid="draftSearch"/>
+			) a
+		)b
+		<![CDATA[
+			where b.rnum >= #{startRow} and b.rnum <= #{endRow}
+		]]>
+	</select>
+	
+	<!-- 결재 완료 건수 -->
+	<select id="getCompletedCnt" parameterType="kr.or.ddit.vo.PaginationInfoVO" resultType="int">
+		select count(*)
+		from sanctn_doc
+		where emp_no = #{empNo}
+		and doc_process_sttus = '09003'
+		<include refid="draftSearch"/>
+	</select>
+	
+	<!-- 결재 완료 List 가져오기 -->
+	<select id="getCompletedList" parameterType="kr.or.ddit.vo.PaginationInfoVO" resultType="kr.or.ddit.vo.SanctnDocVO">
+		select b.*
+		from(
+		    select a.*, row_number() over (order by a.sanctn_doc_no desc) as rnum
+		    from (
+		        select sd.sanctn_doc_no, sd.form_no, sd.emp_no, sd.wrt_dt, sd.sanctn_title, sd.sanctn_cn, sd.sanctn_ty, 
+		               sd.doc_process_sttus, sd.sanctn_opinion, sd.last_atrz_dt, sd.del_ty, sd.emrgncy_yn, sd.file_group_no, 
+		               e.emp_nm as empNm, d.dept_nm as deptNm,
+		               case when exists (
+			              select 1 
+			              from files f 
+			              where f.file_group_no = sd.file_group_no
+		               ) then 'Y' else 'N' end as hasFile
+		        from sanctn_doc sd
+		        inner join emp e on (sd.emp_no = e.emp_no)
+		        inner join dept d on (e.dept_no = d.dept_no)
+		        where sd.emp_no = #{empNo}
+		          and sd.doc_process_sttus = '09003'
+				<include refid="draftSearch"/>
+			) a
+		)b
+		<![CDATA[
+			where b.rnum >= #{startRow} and b.rnum <= #{endRow}
+		]]>
+	</select>
+	
+	<!-- 참조 건수 가져오기 -->
+	<select id="getCCDocCnt" parameterType="kr.or.ddit.vo.PaginationInfoVO" resultType="int">
+		select count(*)
+		from sanctn_cc sc
+        inner join sanctn_doc sd on(sc.sanctn_doc_no = sd.sanctn_doc_no)
+		where sc.emp_no ='202508009'
+        and (sd.doc_process_sttus = '09002' or sd.doc_process_sttus = '09003' or sd.doc_process_sttus = '09004')
+		<include refid="inBoxSearch"/>
+	</select>
+	
+	
+	<!-- 참조 List 가져오기 -->
+	<select id="getCCDocList" parameterType="kr.or.ddit.vo.PaginationInfoVO" resultType="kr.or.ddit.vo.SanctnDocVO">
+		select b.*
+		from(
+			select a.*, row_number() over (order by a.sanctn_doc_no desc) as rnum
+			from (
+			    select sd.sanctn_doc_no, sd.form_no, sd.emp_no, sd.wrt_dt, sd.sanctn_title, sd.sanctn_cn, sd.sanctn_ty, 
+			           sd.doc_process_sttus, sd.sanctn_opinion, sd.last_atrz_dt, sd.del_ty, sd.emrgncy_yn, sd.file_group_no, 
+			           e.emp_nm as empNm, d.dept_nm as deptNm, sc.emp_no as ccEmpNo,
+			           case when exists (
+			              select 1 
+			              from files f 
+			              where f.file_group_no = sd.file_group_no
+		               ) then 'Y' else 'N' end as hasFile
+			    from sanctn_doc sd
+			    inner join emp e on (sd.emp_no = e.emp_no)
+			    inner join dept d on (e.dept_no = d.dept_no)
+			    left join sanctn_cc sc on(sd.sanctn_doc_no = sc.sanctn_doc_no)
+			    where sc.emp_no = #{empNo}
+			    and (sd.doc_process_sttus = '09002' or sd.doc_process_sttus = '09003' or sd.doc_process_sttus = '09004')
+			    <include refid="inBoxSearch"/>
+		    )a
+		)b
+		<![CDATA[
+			where b.rnum >= #{startRow} and b.rnum <= #{endRow}
+		]]>
+	</select>
+	
+	<!-- 페이지 건수 가져오기 -->
+	<select id="getRejectDocCnt" parameterType="kr.or.ddit.vo.PaginationInfoVO" resultType="int">
+		select count(*)
+		from sanctn_doc
+		where emp_no = #{empNo}
+		and doc_process_sttus = '09004'
+		<include refid="draftSearch"/>
+	</select>
+	
+	<!-- 반려함 페이지 List 가져오기 -->
+	<select id="getRejectDoc" parameterType="kr.or.ddit.vo.PaginationInfoVO" resultType="kr.or.ddit.vo.SanctnDocVO">
+		select b.*
+		from(
+			select a.*, row_number() over (order by a.sanctn_doc_no desc) as rnum
+			from (
+			    select sd.sanctn_doc_no, sd.form_no, sd.emp_no, sd.wrt_dt, sd.sanctn_title, sd.sanctn_cn, sd.sanctn_ty, 
+			           sd.doc_process_sttus, sd.sanctn_opinion, sd.last_atrz_dt, sd.del_ty, sd.emrgncy_yn, sd.file_group_no, 
+			           e.emp_nm as empNm, d.dept_nm as deptNm,
+			           case when exists (
+			              select 1 
+			              from files f 
+			              where f.file_group_no = sd.file_group_no
+		               ) then 'Y' else 'N' end as hasFile
+			    from sanctn_doc sd
+			    inner join emp e on (sd.emp_no = e.emp_no)
+			    inner join dept d on (e.dept_no = d.dept_no)
+			    where sd.emp_no = #{empNo}
+			    and sd.doc_process_sttus = '09004'
+			    <include refid="draftSearch"/>
+		    )a
+		)b
+		<![CDATA[
+			where b.rnum >= #{startRow} and b.rnum <= #{endRow}
+		]]>
+	</select>
+	
+	<!-- 반려시 문서 상태 udp -->
+	<update id="approvalDocSttusUdp" parameterType="String">
+		update sanctn_doc
+		set doc_process_sttus = '09004'
+		where sanctn_doc_no = #{sanctnDocNo}
+	</update>
+	
+	<!-- 파일 그룹번호 가져오기 -->
+	<select id="getSaveFileGroupNo" parameterType="String" resultType="int">
+		select file_group_no
+		from sanctn_doc
+		where sanctn_doc_no = #{sanctnDocNo}
+	</select>
+	
+	<!-- 사용자 기안 문서 가져오기 -->
+	<select id="getDashBoardList" parameterType="String" resultType="kr.or.ddit.vo.SanctnDocVO">
+		select *
+		from (
+		    select sd.sanctn_doc_no, sd.form_no, sd.emp_no, sd.wrt_dt, sd.sanctn_title, sd.sanctn_cn,
+		           sd.sanctn_ty, sd.doc_process_sttus, sd.sanctn_opinion, sd.last_atrz_dt,
+		           sd.del_ty, sd.emrgncy_yn, sd.file_group_no, e.emp_nm as empNm,
+		           case when exists (
+		              select 1 
+		              from files f 
+		              where f.file_group_no = sd.file_group_no
+	               ) then 'Y' else 'N' end as hasFile
+		    from sanctn_doc sd
+		    inner join emp e on(e.emp_no = sd.emp_no)
+		    where sd.emp_no = #{empNo}
+            and del_ty = 'N'
+		    order by sd.sanctn_doc_no desc
+		)
+		<![CDATA[
+			where rownum <= 5
+		]]>
+	</select>
+	
+	<!-- 전자결재 즐겨찾기 양식 -->
+	<select id="getSanctnFormBkmk" parameterType="String" resultType="kr.or.ddit.vo.SanctnFormBkmkVO">
+		select sfb.emp_no, sfb.form_no, sf.form_nm as formNm, sf.form_dc as formDc
+		from sanctn_form_bkmk sfb
+        inner join sanctn_form sf on(sfb.form_no = sf.form_no)
+		where sfb.emp_no = #{empNo}
+	</select>
+	
+	<!-- 양식 즐겨찾기 insert -->
+	<insert id="insertApprovalFormBkmk" parameterType="kr.or.ddit.vo.SanctnFormBkmkVO">
+		insert into sanctn_form_bkmk(
+			emp_no, form_no
+		)
+		values(
+			#{empNo}, #{formNo}
+		)
+	</insert>
+	
+	<!-- 양식 즐겨찾기 delete -->
+	<delete id="deleteApprovalFormBkmk" parameterType="kr.or.ddit.vo.SanctnFormBkmkVO">
+		delete from sanctn_form_bkmk
+		where emp_no = #{empNo}
+		and form_no = #{formNo}
+	</delete>
+	
+	<!-- 즐겨찾기 갯수 get -->
+	<select id="getBkmkCnt" parameterType="String">
+		select count(*)
+		from sanctn_form_bkmk
+		where emp_no = #{empNo}
+	</select>
+	
+	<!-- 전자결재 임시저장 파일 delete -->
+	<delete id="delFile" parameterType="kr.or.ddit.vo.FilesVO">
+		delete from files
+		where file_no = #{fileNo}
+	</delete>
+	
+	<!-- 마지막 결재자 결재상태 가져오기 -->
+	<select id="getLastSanctnSttus" parameterType="Map" resultType="String">
+		select sanctn_sttus
+		from sanctner
+		where last_sanctner = #{lastEmpNo}
+		and sanctn_doc_no = #{sanctnDocNo}
+	</select>
+	
+	<select id="getIssuYr" parameterType="String" resultType="String">
+		select
+			max(issu_yr)
+		from yryc_sttus
+		where emp_no = #{empNo}
+		  and use_co is null
+	</select>
+	
+	<!-- 연차현황 테이블 update -->
+	<insert id="insertYrycSttus" parameterType="kr.or.ddit.vo.attendance.YrycSttusVO">
+		insert into yryc_sttus(
+			yryc_sttus_no, emp_no, issu_yr, tot_yryc_co, use_co, start_dt, end_dt
+		)values(
+			seq_yryc_sttus.nextval, #{empNo}, #{issuYr}, 20, #{useCo}, #{startDt}, #{endDt}
+		)
+	</insert>
+	
+	<!-- 대결자 설정시 최종결재자 바꿔줘야하니 결재문서 가져오기 -->
+	<select id="getDocSanctner" parameterType="String" resultType="kr.or.ddit.vo.SanctnerVO">
+		select sanctner_no, sanctn_doc_no, emp_no, last_sanctner, last_sanctner_jbgd, sanctn_ordr, 
+		        sanctn_sttus, atrz_dt, sanctn_opinion, dcrb_auth_yn, sign_file_path
+		from sanctner
+		where last_sanctner = #{empNo}
+		and (sanctn_sttus = '20001' or sanctn_sttus = '20002')
+		order by sanctn_doc_no
+	</select>
+	
+	<!-- 최종결재자를 대결자로 update -->
+	<update id="mdfSanctnerInfo" parameterType="Map">
+		update sanctner
+		set last_sanctner = #{proxyEmpNo}
+		where sanctn_doc_no = #{sanctnDocNo}
+		and last_sanctner = #{empNo}
+	</update>
+	
+	<!-- 최종결재자를 다시 원래 위임자로 update -->
+	<update id="mdfProxySanctnerInfo" parameterType="Map">
+		update sanctner
+		set last_sanctner = #{empNo}
+		where sanctn_doc_no = #{sanctnDocNo}
+		and last_sanctner = #{proxyEmpNo}
+	</update>
+	
+	<!-- 대결자 정보 가져오기 -->
+	<select id="getProxySanctnerInfo" parameterType="int" resultType="kr.or.ddit.vo.ProxySanctnerVO">
+		select proxy_sanctner_no, emp_no, proxy_emp_no, begin_ymd, end_ymd
+		from proxy_sanctner
+		where proxy_sanctner_no = #{proxySanctnerNo}
+	</select>
+	
+	<!-- 전 문서 결재 내용 가져오기 -->
+	<select id="getApprovalLastDocInfo" parameterType="String" resultMap="approvalDocMap">
+        select sd.sanctn_doc_no, sd.form_no, sd.emp_no, sd.wrt_dt, sd.sanctn_title, sd.sanctn_cn, sd.sanctn_ty, 
+            sd.doc_process_sttus, sd.sanctn_opinion, sd.last_atrz_dt, sd.del_ty, sd.emrgncy_yn, sd.file_group_no,
+            f.original_nm as originalNm, f.saved_nm as savedNm, f.file_no as fileNo
+		from sanctn_doc sd
+        left join files f on(sd.file_group_no = f.file_group_no)
+		where sanctn_doc_no = #{reSanctnDocNo}
+	</select>
+	
+</mapper>

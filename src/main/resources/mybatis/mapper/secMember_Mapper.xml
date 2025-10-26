@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.or.ddit.jwt.mapper.ISecMemberMapper">
+
+	<resultMap type="kr.or.ddit.vo.BlogMemberVO" id="memberMap">
+		<id property="memNo" column="mem_no"/>
+		<result property="memNo" column="mem_no"/>
+		<result property="memId" column="mem_id"/>
+		<result property="memPw" column="mem_pw"/>
+		<result property="memName" column="mem_name"/>
+		<result property="memEmail" column="mem_email"/>
+		<result property="memProfileimg" column="mem_profileimg"/>
+		<result property="memRegdate" column="mem_regdate"/>
+		<result property="memUpddate" column="mem_upddate"/>
+		<collection property="authList" resultMap="authMap"/>
+	</resultMap>
+	
+	<resultMap type="kr.or.ddit.vo.BlogMemberAuthVO" id="authMap">
+<!-- 		<result property="memNo" column="mem_no"/> -->
+		<result property="auth" column="auth"/>
+	</resultMap>
+	
+	<select id="readByUserInfo" parameterType="string" resultMap="memberMap">
+		select
+			m.mem_no, mem_id, mem_pw, mem_name, mem_email, mem_profileimg, mem_regdate, mem_upddate, auth
+		from blogmember m left outer join blogmember_auth ma on(m.mem_no = ma.mem_no)
+		where mem_id = #{memId}
+	</select>
+
+</mapper>
+
+
+
+
+

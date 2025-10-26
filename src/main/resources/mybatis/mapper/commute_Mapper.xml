@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.or.ddit.employee.main.mapper.ICommuteMapper">
+
+	<select id="getTodayEmpRecord" parameterType="kr.or.ddit.vo.attendance.WorkRcordVO" resultType="kr.or.ddit.vo.attendance.WorkRcordVO">
+		SELECT
+			work_rcord_no,
+		    emp_no,
+		    work_ymd,
+		    begin_time,
+		    end_time,
+		    work_sttus
+		FROM 
+			work_rcord
+		WHERE
+			emp_no = #{empNo}
+		AND	
+			work_ymd = #{workYmd}
+	</select>
+	
+	<select id="getWorkType" parameterType="string" resultType="kr.or.ddit.vo.main.WorkTyVO">
+		SELECT
+		    wt.work_ty_no,
+		    work_ty_nm,
+		    work_ty_dc,
+		    work_begin_time,
+		    work_end_time,
+		    flextime_begin_time,
+		    flextime_end_time,
+		    use_yn,
+		    reg_ymd,
+		    mdfcn_ymd
+		FROM
+		    emp e
+		INNER JOIN dept d ON (e.dept_no = d.dept_no)
+		INNER JOIN work_ty wt ON (d.work_ty_no = wt.work_ty_no)
+		WHERE e.emp_no = #{empNo}
+	</select>
+	
+	<insert id="insertWorkRecord" parameterType="kr.or.ddit.vo.attendance.WorkRcordVO" useGeneratedKeys="true">
+		<selectKey resultType="int" keyProperty="workRcordNo" order="BEFORE" >
+			SELECT SEQ_WORK_RCORD.NEXTVAL FROM DUAL
+		</selectKey>
+		INSERT INTO work_rcord (
+		    work_rcord_no,
+		    emp_no,
+		    work_ymd,
+		    begin_time,
+		    end_time,
+		    work_sttus
+		) VALUES (
+		    #{workRcordNo},
+		    #{empNo},
+		    #{workYmd},
+		    #{beginTime},
+		    null,
+		    #{workSttus}
+		)
+	</insert>
+	
+	<insert id="insertWorkHistory" parameterType="kr.or.ddit.vo.attendance.WorkRcordVO">
+		INSERT INTO work_hist (
+		    work_hist_no,
+		    work_rcord_no,
+		    work_sttus,
+		    hist_dt
+		) VALUES (
+		    SEQ_WORK_HIST.NEXTVAL,
+		    #{workRcordNo},
+		    #{workSttus},
+		    SYSDATE
+		)
+	</insert>
+	
+	<update id="updateRecordEndTime" parameterType="kr.or.ddit.vo.attendance.WorkRcordVO">
+		UPDATE work_rcord
+		SET
+		   end_time = #{endTime}
+		WHERE
+		    emp_no = #{empNo}
+		AND work_ymd = #{workYmd}
+	</update>
+	
+	
+	<insert id="insertWorkRecordForVacation" parameterType="kr.or.ddit.vo.attendance.WorkRcordVO" useGeneratedKeys="true">
+		<selectKey resultType="int" keyProperty="workRcordNo" order="BEFORE" >
+			SELECT SEQ_WORK_RCORD.NEXTVAL FROM DUAL
+		</selectKey>
+		INSERT INTO work_rcord (
+		    work_rcord_no,
+		    emp_no,
+		    work_ymd,
+		    begin_time,
+		    end_time,
+		    work_sttus
+		) VALUES (
+		    #{workRcordNo},
+		    #{empNo},
+		    #{workYmd},
+		    null,
+		    null,
+		    #{workSttus}
+		)
+	</insert>
+	
+	<update id="updateBeginTime" parameterType="kr.or.ddit.vo.attendance.WorkRcordVO">
+		UPDATE work_rcord 
+		SET 
+			begin_time = #{beginTime}
+		WHERE 
+			emp_no = #{empNo}
+		AND	work_ymd = #{workYmd}
+	</update>
+</mapper>

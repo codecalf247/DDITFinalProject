@@ -1,0 +1,447 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.or.ddit.employee.survey.mapper.ISurveyMapper">
+
+    <select id="countAllSurveys" resultType="int">
+        SELECT
+            COUNT(*)
+        FROM
+            survey
+        WHERE
+            survey_ddln_dt > SYSDATE
+        AND
+            del_yn = 'N'
+    </select>
+    
+   <select id="selectSurveyList" parameterType="map" resultType="kr.or.ddit.vo.SurveyVO">
+    SELECT
+        b.*
+    FROM (
+        SELECT
+            ROW_NUMBER() OVER (ORDER BY s.survey_reg_dt DESC) rnum,
+            s.survey_no,
+            s.survey_title,
+            s.survey_reg_dt,
+            s.survey_ddln_dt,
+            s.private_yn,
+            s.othbc_yn
+        FROM
+            survey s
+        LEFT OUTER JOIN SURVEY_PRTCPNT sp ON (s.SURVEY_NO = sp.SURVEY_NO AND sp.EMP_NO = #{empNo})
+        WHERE
+            s.survey_ddln_dt > SYSDATE
+        AND
+            s.del_yn = 'N'
+        AND
+            sp.EMP_NO IS NULL
+    ) b
+    <![CDATA[
+    WHERE b.rnum BETWEEN #{pagingVO.startRow} AND #{pagingVO.endRow}
+    ]]>
+</select>
+    
+    <resultMap id="rspnsMap" type="kr.or.ddit.vo.RspnsVO">
+	    <id property="rspnsNo" column="RSPNS_NO"/>
+	    <result property="surveyPrtcpntNo" column="SURVEY_PRTCPNT_NO"/>
+	    <result property="questionNo" column="QUESTION_NO"/>
+	    <result property="qesitmAnswerNo" column="QESITM_ANSWER_NO"/>
+	    <result property="qesitmAnswerCn" column="QESITM_ANSWER_CN"/>
+	    <result property="empNm" column="EMP_NM"/>  
+	</resultMap>
+    
+    <resultMap id="qesitmMap" type="kr.or.ddit.vo.QesitmVO">
+        <id property="qesitmNo" column="QESITM_NO"/>
+        <result property="questionNo" column="QUESTION_NO"/>
+        <result property="qesitmOrdr" column="QESITM_ORDR"/>
+        <result property="qesitmCn" column="QESITM_CN"/>
+    </resultMap>
+    
+    <resultMap id="questionWithOptionsMap" type="kr.or.ddit.vo.QuestionVO">
+        <id property="questionNo" column="QUESTION_NO"/>
+        <result property="surveyNo" column="SURVEY_NO"/>
+        <result property="questionCn" column="QUESTION_CN"/>
+        <result property="questionTy" column="QUESTION_TY"/>
+        <result property="questionOrdr" column="QUESTION_ORDR"/>
+        <result property="mandatoryYn" column="MANDATORY_YN"/>
+        <collection property="qesitmList" ofType="kr.or.ddit.vo.QesitmVO" column="QUESTION_NO" select="selectQesitms"/>
+        <collection property="userRspnsList" ofType="kr.or.ddit.vo.RspnsVO" resultMap="rspnsMap"/>
+    </resultMap>
+
+    <resultMap id="surveyWithQuestionsMap" type="kr.or.ddit.vo.SurveyVO">
+        <id property="surveyNo" column="SURVEY_NO"/>
+        <result property="surveyTitle" column="SURVEY_TITLE"/>
+        <result property="surveyCn" column="SURVEY_CN"/>
+        <result property="surveyRegDt" column="SURVEY_REG_DT"/>
+        <result property="surveyDdlnDt" column="SURVEY_DDLN_DT"/>
+        <result property="privateYn" column="PRIVATE_YN"/>
+        <result property="othbcYn" column="OTHBC_YN"/>
+        <result property="ddlnYn" column="DDLN_YN"/>
+        <result property="delYn" column="DEL_YN"/>
+        <result property="empNo" column="EMP_NO"/>
+        <collection property="questionList" ofType="kr.or.ddit.vo.QuestionVO" column="SURVEY_NO" select="selectQuestions"/>
+    </resultMap>
+    
+    <select id="selectSurvey" parameterType="map" resultMap="surveyWithQuestionsMap">
+		SELECT
+            S.SURVEY_NO,
+            SURVEY_TITLE,
+            SURVEY_CN,
+            SURVEY_REG_DT,
+            SURVEY_DDLN_DT,
+            PRIVATE_YN,
+            OTHBC_YN,
+            DDLN_YN,
+            DEL_YN,
+            SP.emp_no
+        FROM SURVEY S
+        LEFT OUTER JOIN SURVEY_PRTCPNT SP on (SP.emp_no = #{empNo} and sp.survey_no = s.survey_no)
+        WHERE S.SURVEY_NO = #{surveyNo} AND DEL_YN = 'N'
+    </select>
+    
+    <select id="selectQuestions" parameterType="int" resultMap="questionWithOptionsMap">
+        SELECT
+            QUESTION_NO,
+            SURVEY_NO,
+            QUESTION_CN,
+            QUESTION_ORDR,
+            QUESTION_TY,
+            MANDATORY_YN
+        FROM QUESTION
+        WHERE SURVEY_NO = #{surveyNo}
+        ORDER BY QUESTION_ORDR
+    </select>
+    
+<!-- <select id="selectQuestionsWithRspns" parameterType="map" resultMap="questionWithOptionsMap">
+    SELECT
+        Q.QUESTION_NO,
+        Q.SURVEY_NO,
+        QUESTION_CN,
+        QUESTION_ORDR,
+        QUESTION_TY,
+        MANDATORY_YN,
+        RSPNS_NO, 
+        R.SURVEY_PRTCPNT_NO, 
+        QESITM_ANSWER_NO, 
+        QESITM_ANSWER_CN 
+    FROM QUESTION Q
+    LEFT OUTER JOIN RSPNS R on(R.QUESTION_NO = Q.QUESTION_NO)
+    LEFT OUTER JOIN SURVEY_PRTCPNT SP on(sp.survey_prtcpnt_no  = r.survey_prtcpnt_no)
+    WHERE Q.SURVEY_NO = #{surveyNo}
+    AND SP.EMP_NO = #{empNo}
+    ORDER BY Q.QUESTION_ORDR
+</select> -->
+
+<select id="selectQuestionsWithRspns" parameterType="map" resultMap="questionWithOptionsMap">
+        SELECT
+            q.QUESTION_NO, 
+            q.SURVEY_NO, 
+            QUESTION_CN, 
+            QUESTION_ORDR, 
+            QUESTION_TY, 
+            MANDATORY_YN,
+            r.RSPNS_NO,
+            r.SURVEY_PRTCPNT_NO,
+            r.QUESTION_NO,
+            r.QESITM_ANSWER_NO,
+            r.QESITM_ANSWER_CN,
+            sp.emp_no
+        FROM
+            QUESTION q
+        LEFT OUTER JOIN RSPNS r ON r.question_no = q.question_no
+        LEFT OUTER JOIN SURVEY_PRTCPNT sp ON r.SURVEY_PRTCPNT_NO = sp.SURVEY_PRTCPNT_NO
+        WHERE
+            q.SURVEY_NO = #{surveyNo}
+        AND
+            (sp.EMP_NO = #{empNo} OR sp.EMP_NO IS NULL)
+</select>
+    
+    
+    
+    <select id="selectQesitms" parameterType="int" resultMap="qesitmMap">
+        SELECT
+            QESITM_NO,
+            QUESTION_NO,
+            QESITM_ORDR,
+            QESITM_CN
+        FROM QESITM
+        WHERE QUESTION_NO = #{questionNo}
+        ORDER BY QESITM_ORDR
+    </select>
+    
+    <insert id="insertSurvey" parameterType="kr.or.ddit.vo.SurveyVO" useGeneratedKeys="true">
+    	<selectKey keyProperty="surveyNo" order="BEFORE" resultType="int">
+    		select SEQ_SURVEY.nextval from dual
+    	</selectKey>
+    
+    	insert into SURVEY(
+    		SURVEY_NO
+			, SURVEY_TITLE
+			, SURVEY_CN
+			, SURVEY_REG_DT
+			, SURVEY_DDLN_DT
+			, DDLN_YN
+			, DEL_YN
+			, PRIVATE_YN
+			, OTHBC_YN
+    	) values(
+    		#{surveyNo}
+    		, #{surveyTitle}
+    		, #{surveyCn}
+    		, sysdate
+    		, TO_DATE(#{surveyDdlnDt}, 'YYYY-MM-DD"T"HH24:MI')
+    		, 'N'
+    		, 'N'
+    		, #{privateYn}
+    		, #{othbcYn}
+    		
+    	)
+    </insert>
+    
+    <insert id="insertQuestion" parameterType="kr.or.ddit.vo.QuestionVO" useGeneratedKeys="true">
+    	<selectKey keyProperty="questionNo" resultType="int" order="BEFORE">
+    		select SEQ_QUESTION.nextval from dual
+    	</selectKey>    
+    	
+    	insert into question(
+	    	QUESTION_NO
+			, SURVEY_NO
+			, QUESTION_CN
+			, QUESTION_ORDR
+			, QUESTION_TY
+			, MANDATORY_YN
+    	) values(
+    		#{questionNo}
+    		, #{surveyNo}
+    		, #{questionCn}
+    		, #{questionOrdr}
+    		, #{questionTy}
+    		, #{mandatoryYn}
+    	)
+    </insert>
+    
+    <insert id="insertQesitm" parameterType="kr.or.ddit.vo.QesitmVO">
+	    insert into QESITM(
+	    	QESITM_NO
+			, QUESTION_NO
+			, QESITM_ORDR
+			, QESITM_CN
+	    ) values(
+	    	#{qesitmNo}
+	    	, #{questionNo}
+	    	, #{qesitmOrdr}
+	    	, #{qesitmCn}
+	    )
+    </insert>
+    
+    <insert id="insertSurveyPrtcpnt" parameterType="kr.or.ddit.vo.SurveyPrtcpntVO">
+        <selectKey keyProperty="surveyPrtcpntNo" order="BEFORE" resultType="int">
+            SELECT SEQ_SURVEY_PRTCPNT.nextval FROM DUAL
+        </selectKey>
+        INSERT INTO SURVEY_PRTCPNT (
+            SURVEY_PRTCPNT_NO, SURVEY_NO, EMP_NO, PARTCPTN_YMD
+        ) VALUES (
+            #{surveyPrtcpntNo},
+            #{surveyNo},
+            #{empNo},
+            TO_CHAR(SYSDATE, 'YYYYMMDD')
+        )
+    </insert>
+    
+    <insert id="insertRspns">
+        <selectKey keyProperty="rspnsNo" order="BEFORE" resultType="int">
+            SELECT SEQ_RSPNS.nextval FROM DUAL
+        </selectKey>
+        INSERT INTO RSPNS (
+            RSPNS_NO, SURVEY_PRTCPNT_NO, QUESTION_NO, 
+            QESITM_ANSWER_NO, QESITM_ANSWER_CN
+        ) VALUES (
+            #{rspnsNo},
+            #{surveyPrtcpntNo},
+            #{questionNo},
+            <if test="qesitmAnswerNo > 0">
+                #{qesitmAnswerNo},
+            </if>
+            <if test="qesitmAnswerNo == 0">
+                NULL,
+            </if>
+            <if test="qesitmAnswerCn != null">
+                #{qesitmAnswerCn}
+            </if>
+            <if test="qesitmAnswerCn == null">
+                NULL
+            </if>
+        )
+    </insert>
+    
+    <!-- 내가 참여한 설문 나타내기 -->
+     <select id="countJoinedSurveys" parameterType="String" resultType="int">
+        SELECT
+            COUNT(*)
+        FROM
+            SURVEY_PRTCPNT
+        WHERE
+            EMP_NO = #{empNo}
+    </select>
+    
+    <select id="selectJoinedSurveyList" parameterType="map" resultType="kr.or.ddit.vo.SurveyVO">
+        SELECT b.*
+        FROM (
+            SELECT
+                ROW_NUMBER() OVER (ORDER BY sp.SURVEY_NO DESC) rnum,
+                s.SURVEY_NO,
+                s.SURVEY_TITLE,
+                s.SURVEY_REG_DT,
+                s.SURVEY_DDLN_DT,
+                s.PRIVATE_YN,
+                s.OTHBC_YN
+            FROM
+                SURVEY_PRTCPNT sp
+            INNER JOIN SURVEY s ON sp.SURVEY_NO = s.SURVEY_NO
+            WHERE
+                sp.EMP_NO = #{empNo}
+            AND
+                s.DEL_YN = 'N'
+        ) b
+        <![CDATA[
+        WHERE b.rnum BETWEEN #{pagingVO.startRow} AND #{pagingVO.endRow}
+        ]]>
+        ORDER BY b.SURVEY_NO desc
+    </select>
+    
+     <select id="selectUserRspnsList" resultType="kr.or.ddit.vo.RspnsVO">
+        SELECT
+            r.RSPNS_NO,
+            r.SURVEY_PRTCPNT_NO,
+            r.QUESTION_NO,
+            r.QESITM_ANSWER_NO,
+            r.QESITM_ANSWER_CN
+        FROM
+            RSPNS r
+        INNER JOIN SURVEY_PRTCPNT sp ON r.SURVEY_PRTCPNT_NO = sp.SURVEY_PRTCPNT_NO
+        WHERE
+            sp.SURVEY_NO = #{surveyNo}
+        AND
+            sp.EMP_NO = #{empNo}
+    </select>
+    
+    <!-- 마감된 설문목록의 총 개수 조회 -->
+ <select id="countEndedSurveys" resultType="int">
+    SELECT
+        COUNT(*)
+    FROM
+        survey
+    WHERE
+        ddln_yn = 'Y'
+    AND
+        del_yn = 'N'
+</select>
+
+	<!-- 마감된 설문 목록 조회 -->
+	<select id="selectEndedSurveyList" parameterType="map" resultType="kr.or.ddit.vo.SurveyVO">
+     SELECT
+        b.*
+    FROM (
+        SELECT
+            ROW_NUMBER() OVER (ORDER BY survey_reg_dt DESC) rnum,
+            survey_no,
+            survey_title,
+            survey_reg_dt,
+            survey_ddln_dt,
+            private_yn,
+            othbc_yn
+        FROM
+            survey
+        WHERE
+            ddln_yn = 'Y'
+        AND
+            del_yn = 'N'
+    ) b
+    <![CDATA[
+    WHERE b.rnum BETWEEN #{startRow} AND #{endRow}
+    ]]>
+</select>
+
+	<!-- 객관식/복수 선택 투표 통계 조회 -->
+	<select id="selectQesitmStatistics" parameterType="int" resultType="kr.or.ddit.vo.QesitmVO">
+    SELECT
+        Q.QESITM_NO,
+        Q.QESITM_CN,
+        Q.QESITM_ORDR,
+        COUNT(CASE WHEN R.SURVEY_PRTCPNT_NO IN (
+            SELECT SURVEY_PRTCPNT_NO FROM SURVEY_PRTCPNT WHERE SURVEY_NO = (
+                SELECT SURVEY_NO FROM QUESTION WHERE QUESTION_NO = #{questionNo}
+            )
+        ) THEN 1 ELSE NULL END) AS rspnsCount
+    FROM QESITM Q
+    LEFT JOIN RSPNS R ON Q.QESITM_NO = R.QESITM_ANSWER_NO AND R.QUESTION_NO = #{questionNo}
+    WHERE Q.QUESTION_NO = #{questionNo}
+    GROUP BY Q.QESITM_NO, Q.QESITM_CN, Q.QESITM_ORDR
+    ORDER BY Q.QESITM_ORDR ASC
+</select>
+
+	<!-- 주관식 답변 내용 조회 -->
+	<select id="selectSubjectiveAnswers" parameterType="int" resultType="kr.or.ddit.vo.RspnsVO">
+    SELECT
+        R.QESITM_ANSWER_CN,
+        S.EMP_NO,
+        E.EMP_NM
+    FROM RSPNS R
+    JOIN SURVEY_PRTCPNT S ON R.SURVEY_PRTCPNT_NO = S.SURVEY_PRTCPNT_NO
+    JOIN EMP E ON S.EMP_NO = E.EMP_NO
+    WHERE R.QUESTION_NO = #{questionNo}
+    ORDER BY R.RSPNS_NO ASC
+</select>
+
+	<!-- 설문 응답자 목록 조회 -->
+	<select id="getRespondents" parameterType="int" resultType="kr.or.ddit.vo.SurveyPrtcpntVO">
+    SELECT 
+        SP.EMP_NO, 
+        E.EMP_NM
+    FROM SURVEY_PRTCPNT SP
+    JOIN EMP E ON SP.EMP_NO = E.EMP_NO
+    WHERE SP.SURVEY_NO = #{surveyNo}
+    ORDER BY SP.PARTCPTN_YMD ASC
+</select>
+
+<!-- 현재 날짜와 같다면 N으로 바꾸기 -->
+<update id="updateExpiredSurveys">
+    UPDATE SURVEY
+    SET
+        DDLN_YN = 'Y'
+    WHERE
+        SURVEY_DDLN_DT &lt; SYSDATE
+    AND
+        DDLN_YN = 'N'
+</update>
+
+<!-- 참여자 수 계산하는 쿼리 -->
+<select id="countSurveyParticipants" parameterType="int" resultType="int">
+    SELECT
+        COUNT(DISTINCT EMP_NO)
+    FROM
+        SURVEY_PRTCPNT
+    WHERE
+        SURVEY_NO = #{surveyNo}
+</select>
+
+<!-- 마우스를 올렸을 때 사용자의 이름을 가져오는 쿼리 -->	
+<select id="selectRespondentsForOption" parameterType="map" resultType="kr.or.ddit.vo.SurveyPrtcpntVO">
+    SELECT
+        E.EMP_NM
+    FROM RSPNS R
+    JOIN SURVEY_PRTCPNT SP ON R.SURVEY_PRTCPNT_NO = SP.SURVEY_PRTCPNT_NO
+    JOIN EMP E ON SP.EMP_NO = E.EMP_NO
+    WHERE
+        R.QESITM_ANSWER_NO = #{qesitmNo}
+    AND
+        SP.SURVEY_NO = #{surveyNo}
+</select>
+
+<select id="allEmpNotification" parameterType="string" resultType="kr.or.ddit.vo.EmpVO">
+	SELECT *
+  	 	FROM emp
+	WHERE emp_no != #{empNo}
+</select>
+
+
+</mapper>

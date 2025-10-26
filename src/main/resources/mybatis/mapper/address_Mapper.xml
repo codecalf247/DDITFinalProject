@@ -1,0 +1,160 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.or.ddit.employee.address.mapper.IAddressMapper">
+
+  <!-- 내 정보 -->
+  <select id="selectEmpInfo" parameterType="string" resultType="kr.or.ddit.vo.EmpVO">
+    SELECT
+      emp_nm, dept_nm, cmmn_cd_nm AS jbgd_nm
+    FROM emp e
+      INNER JOIN dept d ON d.dept_no = e.dept_no
+      INNER JOIN cmmn_cd cmd ON cmd.cmmn_cd_id = e.jbgd_cd
+    WHERE emp_no = #{empNo}
+  </select>
+
+  <!-- 사내주소록: 총건수 -->
+  <select id="selectEmpAddressCount" parameterType="kr.or.ddit.vo.PaginationInfoVO" resultType="int">
+    SELECT COUNT(e.emp_no)
+    FROM emp e
+      INNER JOIN dept d ON e.dept_no = d.dept_no
+    WHERE e.rsgntn_ymd IS NULL
+    <include refid="searchAddress"/>
+  </select>
+
+  <!-- 사내주소록: 목록 (입사일 오름차순 유지) -->
+  <select id="selectEmpAddressList" parameterType="kr.or.ddit.vo.PaginationInfoVO" resultType="kr.or.ddit.vo.EmpVO">
+    SELECT b.*
+    FROM (
+      SELECT a.*, ROW_NUMBER() OVER (ORDER BY a.jncmp_ymd) rnum
+      FROM (
+        SELECT
+          e.emp_nm, e.email, e.profile_file_path, e.telno, e.ext_no, e.jncmp_ymd,
+          d.dept_nm, cmd.cmmn_cd_nm AS jbgd_nm
+        FROM emp e
+          INNER JOIN dept d ON e.dept_no = d.dept_no
+          LEFT JOIN cmmn_cd cmd ON cmd.cmmn_cd_id = e.jbgd_cd
+        WHERE e.rsgntn_ymd IS NULL
+        and  e.enabled = 1
+          <include refid="searchAddress"/>
+        ORDER BY e.jncmp_ymd
+      ) a
+    ) b
+    <![CDATA[
+      WHERE b.rnum >= #{startRow} AND b.rnum <= #{endRow}
+    ]]>
+  </select>
+
+  <!-- 사내주소록: 검색 조각 (AND/OR 묶기) -->
+  <sql id="searchAddress">
+    <if test="searchType != null and searchType != '' and searchWord != null and searchWord != ''">
+      <choose>
+        <when test="searchType == 'all'">
+          AND (
+               e.emp_nm LIKE '%' || #{searchWord} || '%'
+            OR d.dept_nm LIKE '%' || #{searchWord} || '%'
+          )
+        </when>
+        <when test="searchType == 'empNm'">
+          AND e.emp_nm LIKE '%' || #{searchWord} || '%'
+        </when>
+        <when test="searchType == 'deptNm'">
+          AND d.dept_nm LIKE '%' || #{searchWord} || '%'
+        </when>
+      </choose>
+    </if>
+  </sql>
+
+  <!-- 업체주소록: 총건수 -->
+  <select id="selectCcpyAddressCount" parameterType="kr.or.ddit.vo.PaginationInfoVO" resultType="int">
+    SELECT COUNT(*)
+    FROM ccpy c
+    WHERE 1=1
+    <include refid="searchCcpyAddress"/>
+  </select>
+
+  <!-- 업체주소록: 목록 (★ 최신순: ccpy_no DESC 로 통일) -->
+  <select id="selectCcpyAddressList" parameterType="kr.or.ddit.vo.PaginationInfoVO" resultType="kr.or.ddit.vo.CcpyVO">
+    SELECT b.*
+    FROM (
+      SELECT a.*, ROW_NUMBER() OVER (ORDER BY a.ccpy_no DESC) rnum
+      FROM (
+        SELECT
+          c.ccpy_no, c.ccpy_nm, c.charger_nm, c.charger_telno, c.ccpy_email,
+          d.cmmn_cd_nm AS ccpy_ty, c.ccpy_image_path
+        FROM ccpy c
+          INNER JOIN cmmn_cd d ON d.cmmn_cd_id = c.ccpy_ty
+        WHERE 1=1
+          <include refid="searchCcpyAddress"/>
+        ORDER BY c.ccpy_no DESC
+      ) a
+    ) b
+    <![CDATA[
+      WHERE b.rnum >= #{startRow} AND b.rnum <= #{endRow}
+    ]]>
+  </select>
+
+  <!-- 업체주소록: 검색 조각 -->
+  <sql id="searchCcpyAddress">
+    <if test="searchType != null and searchType != '' and searchWord != null and searchWord != ''">
+      <choose>
+        <when test="searchType == 'all'">
+          AND (
+               c.ccpy_nm   LIKE '%' || #{searchWord} || '%'
+            OR c.charger_nm LIKE '%' || #{searchWord} || '%'
+          )
+        </when>
+        <when test="searchType == 'ccpyNm'">
+          AND c.ccpy_nm LIKE '%' || #{searchWord} || '%'
+        </when>
+        <when test="searchType == 'chargerNm'">
+          AND c.charger_nm LIKE '%' || #{searchWord} || '%'
+        </when>
+      </choose>
+    </if>
+  </sql>
+
+  <!-- 공통코드 -->
+  <select id="selectCommonList" resultType="kr.or.ddit.vo.CommonCodeVO">
+    SELECT cmmn_cd_id, cmmn_cd_nm
+    FROM cmmn_cd
+    WHERE cmmn_cd_group_id = #{groupId}
+    ORDER BY cmmn_cd_id
+  </select>
+
+  <!-- 업체 등록 -->
+  <insert id="insertCcpyAddress" parameterType="kr.or.ddit.vo.CcpyVO">
+    INSERT INTO ccpy (
+      ccpy_no, ccpy_nm, charger_nm, charger_telno, ccpy_email, ccpy_ty, ccpy_image_path
+    ) VALUES (
+      SEQ_CCPY.NEXTVAL, #{ccpyNm}, #{chargerNm}, #{chargerTelno}, #{ccpyEmail}, #{ccpyTy}, #{ccpyImagePath}
+    )
+  </insert>
+
+	<update id="updateCcpyAddress" parameterType="kr.or.ddit.vo.CcpyVO">
+	  UPDATE ccpy
+	     SET ccpy_nm       = #{ccpyNm},
+	         charger_nm    = #{chargerNm},
+	         charger_telno = #{chargerTelno},
+	         ccpy_email    = #{ccpyEmail},
+	         ccpy_ty       = #{ccpyTy},
+	         ccpy_image_path = #{ccpyImagePath}
+	   WHERE ccpy_no = #{ccpyNo}
+	</update>
+
+	 <!-- 삭제 -->
+  <delete id="deleteCcpyAddress" parameterType="int">
+    DELETE FROM ccpy
+     WHERE ccpy_no = #{ccpyNo}
+  </delete>
+
+	<!-- 비동기 이벤트로 Ccpyt 목록에서 사용자 정보 1명을 가져와 모달에 출력할 이벤트 -->
+	<select id="selectCcpy" parameterType="int" resultType="kr.or.ddit.vo.CcpyVO">
+		select 
+			ccpy_no, ccpy_nm, charger_nm, charger_telno, ccpy_email, ccpy_ty, ccpy_image_path
+		from ccpy
+		where ccpy_no = #{ccpyId}
+	</select>
+
+
+
+</mapper>

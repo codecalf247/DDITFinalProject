@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.or.ddit.file.mapper.IFileMapper">
+
+	<select id="createFileGroupNo" resultType="int">
+		SELECT SEQ_FILE_GROUP.NEXTVAL FROM dual
+	</select>
+	
+	<insert id="insertFile" parameterType="kr.or.ddit.vo.FilesVO">
+		INSERT INTO files (
+			file_no, file_group_no, original_nm, saved_nm, file_size, file_path,
+			file_uploader,
+			file_fancysize, file_mime, file_reg_dt, del_yn
+		) VALUES (
+			SEQ_FILE.NEXTVAL, #{fileGroupNo}, #{originalNm}, #{savedNm}, #{fileSize}, #{filePath},
+			#{fileUploader},
+			#{fileFancysize}, #{fileMime}, SYSDATE, 'N'
+		)
+	</insert>
+	
+	<select id="selectFileBySavedNm" parameterType="string" resultType="kr.or.ddit.vo.FilesVO">
+		SELECT
+			file_no, file_group_no, original_nm, saved_nm, file_path, file_size,
+			file_fancysize, file_mime, file_reg_dt, del_yn, file_uploader
+		FROM files
+		WHERE saved_nm = #{savedNm} AND del_yn = 'N'
+	</select>
+</mapper>

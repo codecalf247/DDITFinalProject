@@ -1,0 +1,5 @@
+@charset "UTF-8";
+
+.main_logo{width:100%; display:inline-block; float:left; height:50px; padding: 0 24px; margin-top:24px;}
+.main_logo_img{width:100%; display:inline-block; float:left;}
+.main_logo_img img{width:100%; max-width:50px; border-radius:10px;}

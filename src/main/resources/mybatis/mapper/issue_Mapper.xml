@@ -1,0 +1,331 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.or.ddit.employee.project.mapper.IissueMapper">
+
+
+<resultMap type="kr.or.ddit.vo.IssueCommentVO" id="commentMap">
+		<id property="issueCmNo" column="ISSUE_CM_NO" />
+		<result property="issueNo" column="ISSUE_NO_CM" />
+		<result property="empNo" column="EMP_NO_CM" />
+		<result property="issueCmCn" column="ISSUE_CM_CN" />
+		<result property="issueCmWrtDt" column="ISSUE_CM_WRT_DT" />
+		<result property="issueCmMdfcnDt" column="ISSUE_CM_MDFCN_DT" />
+		<result property="issueCmDelYn" column="ISSUE_CM_DEL_YN" />
+		<result property="empNm" column="EMP_NM_CM" />
+	</resultMap>
+	
+	
+	<resultMap type="kr.or.ddit.vo.IssueVO" id="issueMap">
+		<id property="issueNo" column="ISSUE_NO" />
+		<result property="empNo" column="EMP_NO" />
+		<result property="prjctNo" column="PRJCT_NO" />
+		<result property="issueTitle" column="ISSUE_TITLE" />
+		<result property="issueCn" column="ISSUE_CN" />
+		<result property="issueManager" column="ISSUE_MANAGER" />
+		<result property="issueManagerNm" column="ISSUE_MANAGER_NM" /> 
+		<result property="issueTy" column="ISSUE_TY" />
+		<result property="issueSttus" column="ISSUE_STTUS" />
+		<result property="emrgncyYn" column="EMRGNCY_YN" />
+		<result property="fileGroupNo" column="FILE_GROUP_NO" />
+		<result property="empNm" column="EMP_NM" />	
+		<result property="issueCmtCnt" column="ISSUE_CMT_CNT" /> 
+		<collection property="commentList" ofType="kr.or.ddit.vo.IssueCommentVO" resultMap="commentMap" />
+		<collection property="fileList" ofType="kr.or.ddit.vo.FilesVO">
+			<id property="fileNo" column="FILE_NO" />
+			<result property="fileGroupNo" column="FILE_GROUP_NO" />
+			<result property="originalNm" column="ORIGINAL_NM" />
+			<result property="savedNm" column="SAVED_NM" />
+			<result property="filePath" column="FILE_PATH" />
+			<result property="fileSize" column="FILE_SIZE" />
+			<result property="fileFancysize" column="FILE_FANCYSIZE" />
+			<result property="fileMime" column="FILE_MIME" />
+			<result property="fileRegDt" column="FILE_REG_DT" />
+			<result property="delYn" column="DEL_YN_FILE" />
+			<result property="fileUploader" column="FILE_UPLOADER" />
+		</collection>
+	</resultMap>
+	
+	
+	
+	<select id="issueList" parameterType="int" resultMap="issueMap">
+	    SELECT
+	        I.ISSUE_NO, I.EMP_NO, I.PRJCT_NO, I.ISSUE_TITLE, I.ISSUE_CN,
+	        I.ISSUE_MANAGER, E_MGR.EMP_NM AS ISSUE_MANAGER_NM, 
+	        I.ISSUE_TY, I.ISSUE_STTUS, I.EMRGNCY_YN, I.FILE_GROUP_NO,
+	        (SELECT COUNT(*) FROM ISSUE_CM ICM WHERE ICM.ISSUE_NO = I.ISSUE_NO AND ICM.ISSUE_CM_DEL_YN = 'N') AS ISSUE_CMT_CNT,
+	        F.FILE_NO, F.ORIGINAL_NM, F.SAVED_NM, F.FILE_PATH, F.FILE_SIZE,
+	        F.FILE_FANCYSIZE, F.FILE_MIME, F.FILE_REG_DT, F.DEL_YN AS DEL_YN_FILE, F.FILE_UPLOADER
+	    FROM
+	        ISSUE I 
+	    LEFT OUTER JOIN FILES F ON I.FILE_GROUP_NO = F.FILE_GROUP_NO AND F.DEL_YN = 'N'
+
+	    LEFT OUTER JOIN EMP E_MGR ON I.ISSUE_MANAGER = E_MGR.EMP_NO  WHERE
+	        I.PRJCT_NO = #{prjctNo}
+	    ORDER BY
+	        I.EMRGNCY_YN DESC, I.ISSUE_NO DESC
+	</select>
+	
+	
+		
+	<select id="selectIssueAjaxList" parameterType="kr.or.ddit.vo.PaginationInfoVO" resultMap="issueMap">
+  SELECT X.*
+  FROM (
+    SELECT
+        ROW_NUMBER() OVER(ORDER BY I.EMRGNCY_YN DESC, I.ISSUE_NO DESC) AS RNUM,
+        I.ISSUE_NO, I.EMP_NO, I.PRJCT_NO, I.ISSUE_TITLE, I.ISSUE_CN,
+        I.ISSUE_MANAGER, E_MGR.EMP_NM AS ISSUE_MANAGER_NM, I.ISSUE_TY, I.ISSUE_STTUS, I.EMRGNCY_YN, I.FILE_GROUP_NO,
+        (SELECT COUNT(*) FROM ISSUE_CM ICM WHERE ICM.ISSUE_NO = I.ISSUE_NO AND ICM.ISSUE_CM_DEL_YN = 'N') AS ISSUE_CMT_CNT,
+        F.FILE_NO, F.ORIGINAL_NM, F.SAVED_NM, F.FILE_PATH, F.FILE_SIZE,
+        F.FILE_FANCYSIZE, F.FILE_MIME, F.FILE_REG_DT, F.DEL_YN AS DEL_YN_FILE, F.FILE_UPLOADER
+    FROM
+        ISSUE I 
+    LEFT OUTER JOIN FILES F ON I.FILE_GROUP_NO = F.FILE_GROUP_NO AND F.DEL_YN = 'N'
+    LEFT OUTER JOIN EMP E_MGR ON I.ISSUE_MANAGER = E_MGR.EMP_NO
+    <include refid="issueListFilterWhere"/>
+  ) X
+  WHERE X.RNUM BETWEEN #{startRow} AND #{endRow}
+</select>
+	
+	
+	
+<sql id="issueListFilterWhere">
+    WHERE
+        I.PRJCT_NO = #{data.prjctNo}
+        
+    <if test="searchWord != null and searchWord != ''">
+        AND (
+            I.ISSUE_TITLE LIKE '%' || #{searchWord} || '%'
+            OR I.ISSUE_CN LIKE '%' || #{searchWord} || '%'
+        )
+    </if>
+    
+    <if test="data.issueTy != null and data.issueTy != ''">
+        <choose>
+            <when test="data.issueTy == '현장'"> AND I.ISSUE_TY = '05002' </when>
+            <when test="data.issueTy == '설계'"> AND I.ISSUE_TY = '05003' </when>
+            <when test="data.issueTy == '민원'"> AND I.ISSUE_TY = '05001' </when>
+            <otherwise> AND I.ISSUE_TY = '05005' </otherwise> </choose>
+    </if>
+</sql>
+
+<select id="selectIssueCount" parameterType="kr.or.ddit.vo.PaginationInfoVO" resultType="int">
+    SELECT COUNT(I.ISSUE_NO)
+    FROM ISSUE I
+    <include refid="issueListFilterWhere"/>
+</select>
+
+
+<select id="selectIssueListWithPaging"
+        parameterType="kr.or.ddit.vo.PaginationInfoVO"
+        resultType="kr.or.ddit.vo.IssueVO">
+  SELECT *
+  FROM (
+    SELECT ROWNUM RNUM, A.*
+    FROM (
+      SELECT
+        I.ISSUE_NO,
+        I.PRJCT_NO,
+        I.ISSUE_TITLE,
+        I.ISSUE_STTUS,
+        I.ISSUE_TY,
+        I.EMRGNCY_YN,
+        E_MGR.EMP_NM AS ISSUE_MANAGER_NM,
+        (
+          SELECT COUNT(*)
+          FROM ISSUE_CM ICM
+          WHERE ICM.ISSUE_NO = I.ISSUE_NO
+            AND ICM.ISSUE_CM_DEL_YN = 'N'
+        ) AS ISSUE_CMT_CNT
+      FROM ISSUE I
+      LEFT OUTER JOIN EMP E_MGR ON I.ISSUE_MANAGER = E_MGR.EMP_NO
+      <include refid="issueListFilterWhere"/>
+      <if test="data.issueSttus != null and data.issueSttus != ''">
+        <choose>
+          <!-- UNRESOLVED: 처리완료(22003) 제외 -->
+          <when test="data.issueSttus == 'UNRESOLVED'">
+            AND I.ISSUE_STTUS != '22003'
+          </when>
+          <!-- 그 외엔 코드값 그대로 비교(예: 22003) -->
+          <otherwise>
+            AND I.ISSUE_STTUS = #{data.issueSttus}
+          </otherwise>
+        </choose>
+      </if>
+      ORDER BY I.EMRGNCY_YN DESC, I.ISSUE_NO DESC
+    ) A
+  )
+  WHERE RNUM BETWEEN #{startRow} AND #{endRow}
+</select>
+
+
+<select id="selectIssueTotalCount" parameterType="kr.or.ddit.vo.PaginationInfoVO" resultType="int">
+  SELECT COUNT(*)
+  FROM ISSUE I
+  <include refid="issueListFilterWhere"/>
+  <if test="data.issueSttus != null and data.issueSttus != ''">
+    <choose>
+      <when test="data.issueSttus == 'UNRESOLVED'">
+        AND I.ISSUE_STTUS != '22003'
+      </when>
+      <otherwise>
+        AND I.ISSUE_STTUS = #{data.issueSttus}
+      </otherwise>
+    </choose>
+  </if>
+</select>
+
+
+	
+	<insert id="insert" parameterType="kr.or.ddit.vo.IssueVO">
+		<selectKey keyProperty="issueNo" resultType="int" order="BEFORE">
+			SELECT SEQ_ISSUE.NEXTVAL FROM dual
+		</selectKey>
+		INSERT INTO ISSUE (
+			ISSUE_NO, EMP_NO, PRJCT_NO, ISSUE_TITLE, ISSUE_CN, ISSUE_MANAGER, 
+			ISSUE_TY, ISSUE_STTUS, EMRGNCY_YN, FILE_GROUP_NO
+		) VALUES (
+			#{issueNo}, #{empNo}, #{prjctNo}, #{issueTitle}, #{issueCn}, #{issueManager}, 
+			#{issueTy}, #{issueSttus}, #{emrgncyYn}, #{fileGroupNo}
+		)
+	</insert>
+	<select id="generateFileGroupNo" resultType="int">
+		SELECT SEQ_FILE_GROUP.NEXTVAL FROM dual
+	</select>
+	
+	
+	<insert id="insertFile" parameterType="kr.or.ddit.vo.FilesVO">
+		INSERT INTO files (
+		file_no, file_group_no, original_nm, saved_nm, file_size, file_path,
+		file_uploader,
+		file_fancysize, file_mime, file_reg_dt, del_yn
+		) VALUES (
+		SEQ_FILE.NEXTVAL, #{fileGroupNo}, #{originalNm}, #{savedNm}, #{fileSize}, #{filePath},
+		#{fileUploader},
+		#{fileFancysize}, #{fileMime}, SYSDATE, 'N'
+		)
+	</insert>
+	
+	
+	
+	<select id="selectIssue" parameterType="int" resultMap="issueMap">
+    SELECT
+        A.ISSUE_NO,
+        A.EMP_NO,
+        A.PRJCT_NO,
+        A.ISSUE_TITLE,
+        A.ISSUE_CN,
+        A.ISSUE_MANAGER,
+        E_MGR.EMP_NM AS ISSUE_MANAGER_NM,  A.ISSUE_TY,
+        A.ISSUE_STTUS,
+        A.EMRGNCY_YN,
+        A.FILE_GROUP_NO,
+        (SELECT COUNT(*) FROM ISSUE_CM ICM WHERE ICM.ISSUE_NO = A.ISSUE_NO AND ICM.ISSUE_CM_DEL_YN = 'N') AS ISSUE_CMT_CNT,
+        B.EMP_NM, C.FILE_NO,
+        C.FILE_GROUP_NO AS FILE_GROUP_NO_FILE,
+        C.ORIGINAL_NM,
+        C.SAVED_NM,
+        C.FILE_PATH,
+        C.FILE_SIZE,
+        C.FILE_FANCYSIZE,
+        C.FILE_MIME,
+        C.FILE_REG_DT,
+        C.DEL_YN AS DEL_YN_FILE,
+        C.FILE_UPLOADER,
+        D.ISSUE_CM_NO,
+        D.ISSUE_NO AS ISSUE_NO_CM,
+        D.EMP_NO AS EMP_NO_CM,
+        D.ISSUE_CM_CN,
+        D.ISSUE_CM_WRT_DT,
+        D.ISSUE_CM_MDFCN_DT,
+        D.ISSUE_CM_DEL_YN,
+        E.EMP_NM AS EMP_NM_CM 
+        
+    FROM
+        ISSUE A
+    LEFT OUTER JOIN EMP B ON A.EMP_NO = B.EMP_NO             
+    LEFT OUTER JOIN EMP E_MGR ON A.ISSUE_MANAGER = E_MGR.EMP_NO LEFT OUTER JOIN FILES C ON A.FILE_GROUP_NO = C.FILE_GROUP_NO AND C.DEL_YN = 'N'
+  
+    LEFT OUTER JOIN ISSUE_CM D ON A.ISSUE_NO = D.ISSUE_NO AND D.ISSUE_CM_DEL_YN = 'N'
+    LEFT OUTER JOIN EMP E ON D.EMP_NO = E.EMP_NO
+    WHERE
+        A.ISSUE_NO = #{issueNo}
+    ORDER BY D.ISSUE_CM_WRT_DT ASC
+</select>
+    
+    
+    <insert id="insertIssueComment" parameterType="kr.or.ddit.vo.IssueCommentVO">
+		<selectKey keyProperty="issueCmNo" resultType="int" order="BEFORE">
+			SELECT SEQ_ISSUE_CM.NEXTVAL FROM dual
+		</selectKey>
+		INSERT INTO ISSUE_CM (
+			ISSUE_CM_NO, ISSUE_NO, EMP_NO, ISSUE_CM_CN, ISSUE_CM_WRT_DT, ISSUE_CM_DEL_YN
+		) VALUES (
+			#{issueCmNo}, #{issueNo}, #{empNo}, #{issueCmCn}, SYSDATE, 'N'
+		)
+	</insert>
+    
+    
+    
+    <update id="updateIssue" parameterType="kr.or.ddit.vo.IssueVO">
+    UPDATE ISSUE
+    SET 
+        ISSUE_TITLE = #{issueTitle},
+        ISSUE_CN = #{issueCn},
+        ISSUE_MANAGER = #{issueManager},
+        ISSUE_TY = #{issueTy},
+        ISSUE_STTUS = #{issueSttus},
+        EMRGNCY_YN = #{emrgncyYn}
+    WHERE ISSUE_NO = #{issueNo}
+</update>
+
+<update id="deleteFile" parameterType="int">
+    UPDATE FILES
+    SET DEL_YN = 'Y'
+    WHERE FILE_NO = #{fileNo}
+</update>
+    
+    <update id="updateIssueComment" parameterType="kr.or.ddit.vo.IssueCommentVO">
+		UPDATE ISSUE_CM
+		SET 
+			ISSUE_CM_CN = #{issueCmCn},
+			ISSUE_CM_MDFCN_DT = SYSDATE 
+		WHERE ISSUE_CM_NO = #{issueCmNo}
+	</update>
+    
+    
+    
+    <select id="getIssueCounts" parameterType="int" resultType="map">
+	SELECT
+	    COUNT(ISSUE_NO) AS TOTALCOUNT,
+	    COUNT(CASE WHEN ISSUE_STTUS != '22003' THEN 1 END) AS UNRESOLVEDCOUNT,
+	    COUNT(CASE WHEN ISSUE_STTUS = '22003' THEN 1 END) AS RESOLVEDCOUNT
+	FROM
+	    ISSUE
+	WHERE
+	    PRJCT_NO = #{prjctNo}
+</select>
+    
+    <delete id="deleteIssue" parameterType="int">
+		DELETE FROM ISSUE
+		WHERE ISSUE_NO = #{issueNo}
+	</delete>
+	
+	<delete id="deleteIssueComments" parameterType="int">
+	  DELETE FROM ISSUE_CM WHERE ISSUE_NO = #{issueNo}
+	</delete>
+	
+	
+	<update id="deleteIssueComment" parameterType="int">
+		UPDATE ISSUE_CM
+		SET ISSUE_CM_DEL_YN = 'Y'
+		WHERE ISSUE_CM_NO = #{issueCmNo}
+	</update>
+
+	<update id="deleteFilesByGroupNo" parameterType="int">
+		UPDATE FILES
+		SET DEL_YN = 'Y'
+		WHERE FILE_GROUP_NO = #{fileGroupNo}
+	</update>
+
+	
+	</mapper>

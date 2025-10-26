@@ -1,0 +1,373 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="kr.or.ddit.employee.project.mapper.IProjectMapper">
+
+
+   <!-- 프로젝트 + 참여자 컬렉션 맵핑 -->
+<resultMap id="projectMap" type="kr.or.ddit.vo.ProjectVO">
+	  <!-- 기본 필드 매핑 -->
+	  <id     property="prjctNo"       column="prjct_no"/>
+	  <result property="prjctCrdYmd"   column="prjct_crd_ymd"/>
+	  <!--  NLS 환경 영향 방지: 'YYYYMMDD' 명시 -->
+	  <result property="prjctStartYmd" column="prjct_start_ymd"/>
+	  <result property="prjctDdlnYmd"  column="prjct_ddln_ymd"/>
+	  <result property="prjctMdfcnYmd" column="prjct_mdfcn_ymd"/>
+	  <result property="prjctSttus"    column="prjct_sttus"/>
+	  <result property="sptNm"         column="spt_nm"/>
+	  <result property="sptAddr"       column="spt_addr"/>
+	  <result property="cstmrNm"       column="cstmr_nm"/>
+	  <result property="cstmrTel"      column="cstmr_tel"/>
+
+	  <!-- 참여자 컬렉션: prjct_no를 파라미터로 nested select 호출 -->
+	  <collection property="participantsList"
+	              ofType="kr.or.ddit.vo.ProjectPerticipantVO"
+	              column="prjct_no"
+	              select="selectParticipantsByProject"/>
+</resultMap>
+
+<resultMap id="projectMap2" type="kr.or.ddit.vo.ProjectVO">
+	  <!-- 기본 필드 매핑 -->
+	  <id     property="prjctNo"       column="prjct_no"/>
+	  <result property="prjctNo"   column="prjct_no"/>
+	  <result property="prjctCrdYmd"   column="prjct_crd_ymd"/>
+	  <!--  NLS 환경 영향 방지: 'YYYYMMDD' 명시 -->
+	  <result property="prjctStartYmd" column="prjct_start_ymd"/>
+	  <result property="prjctDdlnYmd"  column="prjct_ddln_ymd"/>
+	  <result property="prjctMdfcnYmd" column="prjct_mdfcn_ymd"/>
+	  <result property="prjctSttus"    column="prjct_sttus"/>
+	  <result property="sptNm"         column="spt_nm"/>
+	  <result property="sptAddr"       column="spt_addr"/>
+	  <result property="cstmrNm"       column="cstmr_nm"/>
+	  <result property="cstmrTel"      column="cstmr_tel"/>
+
+	  <!-- 참여자 컬렉션: prjct_no를 파라미터로 nested select 호출 -->
+	  <collection property="participantsList" resultMap="projectParticipantMap"/>
+</resultMap>
+
+
+<resultMap id="projectParticipantMap" type="kr.or.ddit.vo.ProjectPerticipantVO" >
+	<id property="prjctNo" column="prjct_no"/>
+	<id property="empNo" column="emp_no"/>
+	<result property="prjctNo" column="prjct_no"/>
+	<result property="empNo" column="emp_no"/>
+	<result property="timhderYn" column="timhder_yn"/>
+	<result property="team" column="team"/>
+</resultMap>
+
+
+<!-- /////////////////////////////////////////////////////////////////////////////////////////////////////  -->
+
+  <!-- 프로젝트 등록 -->
+  <insert id="insertProject" parameterType="kr.or.ddit.vo.ProjectVO" useGeneratedKeys="true">
+    <selectKey keyProperty="prjctNo" resultType="int" order="BEFORE">
+      SELECT seq_prjct.NEXTVAL FROM dual
+    </selectKey>
+	    INSERT INTO prjct (
+	      prjct_no, prjct_crd_ymd, prjct_start_ymd, prjct_ddln_ymd, prjct_mdfcn_ymd, prjct_sttus,
+	      spt_nm, spt_addr, cstmr_nm,
+	      cstmr_tel
+	    ) VALUES (
+	      #{prjctNo},
+	      TO_CHAR(SYSDATE, 'YYYYMMDD'),
+	      REPLACE(#{prjctStartYmd}, '-', ''),
+	      REPLACE(#{prjctDdlnYmd}, '-', ''),
+	      REPLACE(#{prjctMdfcnYmd}, '-', ''),
+	      CASE TRIM(#{prjctSttus})
+	        WHEN '진행중' THEN '17002'
+	        WHEN '보류'   THEN '17004'
+	        WHEN '완료'   THEN '17003'
+	        ELSE #{prjctSttus}
+	      END,
+	      #{sptNm}, #{sptAddr}, #{cstmrNm}, #{cstmrTel}
+	    )
+  </insert>
+
+
+
+<!-- /////////////////////////////////////////////////////////////////////////////////////////////////////  -->
+
+<!-- 프로젝트 수정하기  -->
+
+<update id="updateProject" parameterType="kr.or.ddit.vo.ProjectVO">
+UPDATE 
+	prjct
+SET
+	prjct_start_ymd = REPLACE(#{prjctStartYmd}, '-', ''), 
+	prjct_ddln_ymd = REPLACE(#{prjctDdlnYmd}, '-', ''), 
+	prjct_mdfcn_ymd = TO_CHAR(SYSDATE, 'YYYYMMDD'), 
+	prjct_sttus = NVL(
+      CASE TRIM(#{prjctSttus})
+        WHEN '진행중' THEN '17002'
+        WHEN '완료'   THEN '17003'
+        WHEN '보류'   THEN '17004'
+        WHEN '17002'  THEN '17002'
+        WHEN '17003'  THEN '17003'
+        WHEN '17004'  THEN '17004'
+        ELSE NULL
+      END,
+      prjct_sttus  
+  ),
+	spt_nm = #{sptNm}, 
+	spt_addr = #{sptAddr},
+	cstmr_nm = #{cstmrNm}, 
+	cstmr_tel = #{cstmrTel}
+WHERE
+	prjct_no = #{prjctNo}
+
+</update>
+
+
+<!-- /////////////////////////////////////////////////////////////////////////////////////////////////////  -->
+
+<!-- 프로젝트 넘버 가져오기  -->
+<select id="selectProjectByNo" parameterType="int" resultMap="projectMap2">
+
+SELECT
+	 p.prjct_no, prjct_crd_ymd, prjct_start_ymd, prjct_ddln_ymd, 
+	 prjct_mdfcn_ymd, prjct_sttus, spt_nm, spt_addr, cstmr_nm, cstmr_tel
+	,pp.emp_no
+FROM prjct p left outer join prjct_prtcpnt pp on(p.prjct_no = pp.prjct_no)
+WHERE p.prjct_no = ${prjctNo}
+</select>
+
+
+
+
+
+
+
+
+<!-- /////////////////////////////////////////////////////////////////////////////////////////////////////  -->
+
+  <!-- 프로젝트 출력 -->
+   <select id="selectProjectList"
+          parameterType="kr.or.ddit.vo.PaginationInfoVO"
+          resultMap="projectMap">
+	select b.*
+	from(
+	    select a.*, row_number() over (order by a.prjct_no desc) as rnum
+	    from(
+	        SELECT
+	              p.prjct_no,
+	              p.prjct_crd_ymd,
+	             
+	              TO_CHAR(TO_DATE(p.prjct_start_ymd, 'YYYYMMDD'), 'YYYY-MM-DD') AS prjct_start_ymd,
+	              TO_CHAR(TO_DATE(p.prjct_ddln_ymd,  'YYYYMMDD'), 'YYYY-MM-DD') AS prjct_ddln_ymd,
+	              p.prjct_mdfcn_ymd,
+	           
+	              CASE TRIM(p.prjct_sttus)
+	                WHEN '17002' THEN '진행중'
+	                WHEN '17004' THEN '보류'
+	                WHEN '17003' THEN '완료'
+	                ELSE TRIM(p.prjct_sttus)
+	              END AS prjct_sttus,
+	              p.spt_nm,
+	              p.spt_addr,
+	              p.cstmr_nm,
+	              p.cstmr_tel
+	            FROM prjct p
+	            where 1=1
+	            and p.prjct_sttus = ${data.prjctSttus}
+      			<include refid="searchProject"/>
+	            ORDER BY p.prjct_crd_ymd DESC, p.prjct_no DESC
+	    ) a 
+	) b
+	<![CDATA[
+		where b.rnum >= #{startRow} and b.rnum <= #{endRow}
+	]]>
+  </select>
+
+
+ <!-- 검색 조건 (오타 수정 완료: b.board_title → p.spt_nm) -->
+  <sql id="searchProject">
+    <if test="searchType != null and searchType != '' 
+           and searchWord != null and searchWord != ''">
+      <choose>
+        <!-- 제목=현장명 기준 검색 -->
+        <when test="searchType == 'title'">
+          AND p.spt_nm LIKE '%' || #{searchWord} || '%'
+        </when>
+        <!-- 필요 시 다른 타입 추가 -->
+      </choose>
+    </if>
+  </sql>
+  
+
+
+  <!-- 프로젝트 담당자 지정 -->
+  <insert id="insertProjectParticipants" parameterType="ProjectPerticipantVO">
+    INSERT INTO prjct_prtcpnt (
+      prjct_no, emp_no, timhder_yn, prjct_prtcpnt_type
+    ) VALUES (
+      #{prjctNo}, #{empNo}, (
+      	select (
+    		case jbgd_cd
+    			when '15001' then 'N' 
+           		when '15002' then 'Y'
+            	when '15003' then 'N'
+            	when '15004' then 'N'
+            	when '15005' then 'N'
+    		end
+		) 
+		from emp where emp_no = #{empNo}
+		), #{prjctPrtcpntType}
+    )
+  </insert>
+
+
+
+  <!-- Pagination용 -->
+  <select id="selectProjectListCount" parameterType="kr.or.ddit.vo.PaginationInfoVO" resultType="int">
+  	select count(*)
+  	from prjct p
+  	where 1=1
+    and p.prjct_sttus = ${data.prjctSttus}
+    <include refid="searchProject"/>
+  </select>
+
+
+
+  
+  
+ <!-- participantsList  -->
+<select id="selectParticipantsByProject" parameterType="int" resultType="kr.or.ddit.vo.ProjectPerticipantVO">
+   SELECT
+	    pp.PRJCT_NO,        
+	    pp.EMP_NO,           
+	    pp.TIMHDER_YN,     
+	    e.EMP_NM,            
+	    e.JBGD_CD,           
+	    c.CMMN_CD_NM AS jbgdNm,  <!-- CMMN_CD_NM을 jbgdNm으로 조회 -->
+	    d.DEPT_NM,           
+	    e.profile_file_path AS photoUrl,
+    CASE
+        WHEN UPPER(d.DEPT_NM) LIKE '%디자인%' THEN 'DESIGN'
+        WHEN UPPER(d.DEPT_NM) LIKE '%현장%'   THEN 'FIELD'
+        ELSE 'FIELD'
+    END AS prjct_prtcpnt_type
+	FROM PRJCT_PRTCPNT pp
+	JOIN EMP e
+	  ON e.EMP_NO = pp.EMP_NO
+	LEFT JOIN DEPT d
+	  ON d.DEPT_NO = e.DEPT_NO
+	JOIN CMMN_CD c                     <!-- CMMN_CD 테이블 조인 -->
+	  ON c.CMMN_CD_ID = e.JBGD_CD      <!-- 직급 코드로 조인 -->
+	WHERE pp.PRJCT_NO = #{prjctNo }
+	ORDER BY
+	    prjct_prtcpnt_type,
+    CASE pp.TIMHDER_YN WHEN 'Y' THEN 0 ELSE 1 END,  
+    e.EMP_NM
+</select>
+  
+
+<update id="updateProjectBasic" parameterType="kr.or.ddit.vo.ProjectVO">
+    UPDATE prjct
+    SET
+      prjct_start_ymd = REPLACE(#{prjctStartYmd}, '-', ''),
+      prjct_ddln_ymd = REPLACE(#{prjctDdlnYmd}, '-', ''),
+      prjct_mdfcn_ymd = TO_CHAR(SYSDATE, 'YYYYMMDD'),
+      prjct_sttus = NVL(
+        CASE TRIM(#{prjctSttus})
+          WHEN '진행중' THEN '17002'
+          WHEN '완료'   THEN '17003'
+          WHEN '보류'   THEN '17004'
+          WHEN '17002'  THEN '17002'
+          WHEN '17003'  THEN '17003'
+          WHEN '17004'  THEN '17004'
+          ELSE NULL
+        END,
+        prjct_sttus
+      ),
+      spt_nm = #{sptNm},
+      spt_addr = #{sptAddr},
+      cstmr_nm = #{cstmrNm},
+      cstmr_tel = #{cstmrTel}
+    WHERE
+      prjct_no = #{prjctNo}
+  </update>
+
+
+
+  <select id="selectCommonCodes" parameterType="string" resultType="kr.or.ddit.vo.CommonCodeVO">
+        SELECT
+            CMMN_CD_ID,
+            CMMN_CD_GROUP_ID,
+            CMMN_CD_NM
+        FROM
+            CMMN_CD
+        WHERE
+            CMMN_CD_GROUP_ID = #{cmmnCdGroupId}
+        ORDER BY
+            CMMN_CD_ID
+    </select>
+
+
+
+
+
+
+
+
+
+<!-- 일감 리스트용  -->
+<select id="selectParticipantsByProjectForTasks" parameterType="int" resultType="kr.or.ddit.vo.ProjectPerticipantVO">
+  SELECT
+    pp.PRJCT_NO          AS prjctNo,
+    pp.EMP_NO            AS empNo,
+    pp.TIMHDER_YN        AS timhderYn,
+    e.EMP_NM             AS empNm,
+    e.JBGD_CD            AS jbgdCd,
+    c.CMMN_CD_NM         AS jbgdNm,
+    d.DEPT_NM            AS deptNm,
+    e.PROFILE_FILE_PATH  AS photoUrl,
+    CASE
+      WHEN UPPER(d.DEPT_NM) LIKE '%디자인%' THEN 'DESIGN'
+      WHEN UPPER(d.DEPT_NM) LIKE '%현장%'   THEN 'FIELD'
+      ELSE 'FIELD'
+    END AS prjctPrtcpntType
+  FROM PRJCT_PRTCPNT pp
+  JOIN EMP e         ON e.EMP_NO  = pp.EMP_NO
+  LEFT JOIN DEPT d   ON d.DEPT_NO = e.DEPT_NO
+  JOIN CMMN_CD c     ON c.CMMN_CD_ID = e.JBGD_CD
+  WHERE pp.PRJCT_NO = #{prjctNo}
+  ORDER BY
+    prjctPrtcpntType,
+    CASE pp.TIMHDER_YN WHEN 'Y' THEN 0 ELSE 1 END,
+    e.EMP_NM
+</select>
+
+
+
+<select id="selectProjectIssuesParticipants" parameterType="int" resultType="kr.or.ddit.vo.ProjectPerticipantVO">
+   SELECT
+	    pp.PRJCT_NO,        
+	    pp.EMP_NO,           
+	    pp.TIMHDER_YN,     
+	    e.EMP_NM,            
+	    e.JBGD_CD,           
+	    c.CMMN_CD_NM AS jbgdNm, 
+	    d.DEPT_NM,           
+	    e.profile_file_path AS photoUrl,
+    CASE
+        WHEN UPPER(d.DEPT_NM) LIKE '%디자인%' THEN 'DESIGN'
+        WHEN UPPER(d.DEPT_NM) LIKE '%현장%'   THEN 'FIELD'
+        ELSE 'FIELD'
+    END AS prjct_prtcpnt_type
+	FROM PRJCT_PRTCPNT pp
+	JOIN EMP e
+	  ON e.EMP_NO = pp.EMP_NO
+	LEFT JOIN DEPT d
+	  ON d.DEPT_NO = e.DEPT_NO
+	JOIN CMMN_CD c                     
+	  ON c.CMMN_CD_ID = e.JBGD_CD      
+	WHERE pp.PRJCT_NO = #{prjctNo}
+	ORDER BY
+	    prjct_prtcpnt_type,
+    CASE pp.TIMHDER_YN WHEN 'Y' THEN 0 ELSE 1 END,  
+    e.EMP_NM
+</select>
+
+
+</mapper>

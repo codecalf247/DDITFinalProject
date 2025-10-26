@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.or.ddit.employee.cmmn.mapper.ICMMNMapper">
+
+	<select id="getCMMNID" parameterType="String" resultType="String">
+		select
+			CMMN_CD_ID
+		from
+			CMMN_CD
+		where
+			CMMN_CD_NM = #{cMMNCdNm}
+	</select>
+	
+	<select id="getCMMNName" parameterType="String" resultType="String">
+		select
+			CMMN_CD_NM
+		from
+			CMMN_CD
+		where
+			CMMN_CD_ID = #{cMMNId}
+	</select>
+	
+	<select id="getCMMNIdByGroupId" parameterType="hashMap" resultType="string">
+    SELECT cmmn_cd_id
+    FROM   cmmn_cd
+    WHERE  cmmn_cd_group_id = #{groupId}
+  </select>
+  
+  <select id="getCMMNListbyGroupId" parameterType="string">
+      SELECT cmmn_cd_id, cmmn_cd_group_id, cmmn_cd_nm
+        FROM cmmn_cd
+       WHERE cmmn_cd_group_id = #{groupId}
+  </select>
+
+</mapper>

@@ -1,0 +1,143 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.or.ddit.manager.adequip.mapper.IEquipMapper">
+	
+  <!-- 파일 그룹 번호 발급 (시퀀스) -->
+  <select id="generateFileGroupNo" resultType="int">
+      SELECT SEQ_FILE_GROUP.NEXTVAL FROM DUAL
+  </select>
+
+  <!-- 장비 등록 -->
+  <insert id="insertEquip" parameterType="kr.or.ddit.vo.EqpmnVO">
+      INSERT INTO EQPMN
+      (
+          eqpmn_no, eqpmn_nm, file_group_no, eqpmn_sttus, eqpmn_dc, eqpmn_reg_ymd
+      )
+      VALUES
+      (
+          SEQ_EQPMN.NEXTVAL, #{eqpmnNm}, #{fileGroupNo}, #{eqpmnSttus}, #{eqpmnDc}, #{eqpmnRegYmd}
+      )
+  </insert>
+
+  <!-- 파일 등록 -->
+  <insert id="insertFile" parameterType="kr.or.ddit.vo.FilesVO">
+      INSERT INTO FILES
+      (
+          file_no, file_group_no, original_nm, saved_nm, file_path, file_size, file_uploader,
+          file_fancysize, file_mime, file_reg_dt, del_yn
+      )
+      VALUES
+      (
+          SEQ_FILE.NEXTVAL, #{fileGroupNo}, #{originalNm}, #{savedNm}, #{filePath}, #{fileSize},
+          #{fileUploader}, #{fileFancysize}, #{fileMime}, SYSDATE, 'N'
+      )
+  </insert>
+
+  <!-- 장비 총 개수 -->
+  <select id="selectEqpmnCount" parameterType="kr.or.ddit.vo.PaginationInfoVO" resultType="int">
+    SELECT COUNT(e.eqpmn_no)
+    FROM eqpmn e
+    <include refid="searchEqpmn"/>
+  </select>
+
+  <!-- 장비 목록 (등록일 + PK 내림차순, 페이징) -->
+<select id="selectEqpmnList" parameterType="kr.or.ddit.vo.PaginationInfoVO"
+        resultType="kr.or.ddit.vo.EqpmnVO">
+  SELECT b.*
+  FROM (
+    SELECT a.*,
+           ROW_NUMBER() OVER (ORDER BY a.eqpmn_reg_ymd DESC, a.eqpmn_no DESC) rnum
+    FROM (
+      SELECT
+        e.eqpmn_no, e.eqpmn_nm, e.file_group_no, 
+        
+        (SELECT file_path 
+          FROM files f
+          WHERE f.file_group_no = e.file_group_no
+            AND f.del_yn = 'N')                                       AS file_path,
+        cmd.cmmn_cd_id                                                AS eqpmn_sttus,
+        cmd.cmmn_cd_nm                                                AS eqpmnSttusNm,
+        e.eqpmn_dc,
+        TO_CHAR(TO_DATE(e.eqpmn_reg_ymd,'yyyyMMdd'),'yyyy-MM-dd')     AS eqpmn_reg_ymd,
+        (SELECT COUNT(*) FROM eqpmn_hist eh2 WHERE eh2.eqpmn_no = e.eqpmn_no) AS eqpmn_hist_cnt,
+
+        
+        (SELECT emp.emp_nm
+           FROM eqpmn_hist eh
+           JOIN emp emp ON emp.emp_no = eh.emp_no
+          WHERE eh.eqpmn_no = e.eqpmn_no
+            AND eh.rturn_dt IS NULL
+            AND ROWNUM = 1)                                          AS empNm
+            
+      FROM eqpmn e
+      INNER JOIN cmmn_cd cmd ON cmd.cmmn_cd_id = e.eqpmn_sttus
+      <include refid="searchEqpmn"/>
+    ) a
+  ) b
+  <![CDATA[
+    WHERE b.rnum >= #{startRow} AND b.rnum <= #{endRow}
+  ]]>
+</select>
+
+
+  <!-- 장비 검색 조건 (상태 + 장비명) -->
+  <sql id="searchEqpmn">
+    <where>
+      <!-- 상태 필터 -->
+      <if test="statusFilter != null and statusFilter != ''">
+        <choose>
+          <when test="statusFilter == 'normal'">
+            AND e.eqpmn_sttus = '13001'
+          </when>
+          <when test="statusFilter == 'rent'">
+            AND e.eqpmn_sttus = '13002'
+          </when>
+          <when test="statusFilter == 'repair'">
+            AND e.eqpmn_sttus = '13003'
+          </when>
+        </choose>
+      </if>
+
+      <!-- 검색어 (장비명만) -->
+      <if test="searchWord != null and searchWord != ''">
+        AND e.eqpmn_nm LIKE '%' || #{searchWord} || '%'
+      </if>
+    </where>
+  </sql>
+
+  <!-- 공통코드 조회 -->
+  <select id="selectCommonList" resultType="kr.or.ddit.vo.CommonCodeVO">
+    SELECT cmmn_cd_id, cmmn_cd_nm
+    FROM cmmn_cd
+    WHERE cmmn_cd_group_id = #{groupId}
+    ORDER BY cmmn_cd_id
+  </select>
+  
+  <update id="deleteEqpmnFile" parameterType="int">
+  	update files
+  	set
+  		del_yn = 'Y'
+  	where file_group_no = #{fileGroupNo}
+  </update>
+  
+  <update id="updateEqpmn" parameterType="kr.or.ddit.vo.EqpmnVO">
+  	update eqpmn
+  	set
+  		EQPMN_NM = #{eqpmnNm}, 
+  		EQPMN_STTUS = #{eqpmnSttus}, 
+  		EQPMN_DC = #{eqpmnDc} 
+  	where EQPMN_NO = #{eqpmnNo}
+  </update>
+
+<delete id="deleteEqpmn" parameterType="string">
+  DELETE FROM eqpmn
+  WHERE eqpmn_no = #{eqpmnNo}
+</delete> 
+
+
+
+
+
+
+
+</mapper>

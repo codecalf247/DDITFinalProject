@@ -1,0 +1,117 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.or.ddit.manager.deptManagement.mapper.IDeptMapper">
+
+	<!-- 상위 부서 정보 가져오기 -->
+	<select id="getUpperDeptList" resultType="kr.or.ddit.vo.DeptVO">
+		select d.upper_dept_no, ud.dept_nm as upperDeptNm, count(*) as deptEmpCnt
+		from emp e
+		inner join dept d on e.dept_no = d.dept_no
+		inner join dept ud on d.upper_dept_no = ud.dept_no
+		where e.enabled = 1
+		group by d.upper_dept_no, ud.dept_nm
+	</select>
+
+	<!-- 부서 정보 가져오기 -->
+	<select id="getDeptList" resultType="kr.or.ddit.vo.DeptVO">
+		select  dept_no, upper_dept_no, work_ty_no, dept_nm, dept_crt_ymd,
+		   		 (select count(*) from emp e where e.dept_no = d.dept_no) as dept_emp_cnt
+		from dept d
+		where upper_dept_no is null
+		order by dept_no asc, upper_dept_no asc
+	</select>
+	
+	<!-- 하위 부서 정보 가져오기 -->
+	<select id="getDeptSubList" resultType="kr.or.ddit.vo.DeptVO">
+		select d.dept_no, d.upper_dept_no, d.dept_nm
+		from dept d
+		where upper_dept_no is not null
+		order by d.dept_no asc, d.upper_dept_no asc
+	</select>
+	
+	<!-- 부서별 사원 정보 가져오기 -->
+	<select id="getDeptEmpList" parameterType="kr.or.ddit.vo.DeptVO" resultType="kr.or.ddit.vo.DeptVO">
+		select d.dept_no, d.upper_dept_no, d.work_ty_no, d.dept_nm, d.dept_crt_ymd,
+		        e.emp_nm as empNm, cc.cmmn_cd_nm as jbgdCd, e.emp_no as empNo
+		from dept d
+		inner join emp e on(e.dept_no = d.dept_no)
+		inner join cmmn_cd cc on(cc.cmmn_cd_id = e.jbgd_cd)
+		where d.upper_dept_no = #{upperDeptNo}
+		and e.enabled = 1
+		order by d.dept_no, cc.cmmn_cd_id
+	</select>
+	
+	<!-- 부서별 하위 사원 정보 가져오기 -->
+	<select id="getDeptTeamEmpList" parameterType="kr.or.ddit.vo.DeptVO" resultType="kr.or.ddit.vo.DeptVO">
+		select d.dept_no, d.upper_dept_no, d.work_ty_no, d.dept_nm, d.dept_crt_ymd,
+		        e.emp_nm as empNm, cc.cmmn_cd_nm as jbgdCd, e.emp_no as empNo
+		from dept d
+		inner join emp e on(e.dept_no = d.dept_no)
+		inner join cmmn_cd cc on(cc.cmmn_cd_id = e.jbgd_cd)
+		where d.dept_no = #{deptNo}
+		and e.enabled = 1
+		order by d.dept_no, cc.cmmn_cd_id
+	</select>
+	
+	<!-- 사원 부서 이동 -->
+	<update id="empDeptMove" parameterType="kr.or.ddit.vo.DeptVO">
+		update emp
+		set dept_no = #{deptNo}
+		where emp_no = #{empNo}
+	</update>
+	
+	<!-- 부서 수정 -->
+	<update id="mdfDept" parameterType="kr.or.ddit.vo.DeptVO">
+		update dept
+		set dept_nm = #{deptNm}
+		where dept_no = #{deptNo}
+	</update>
+	
+	<!-- 하위 부서 삭제 -->
+	<delete id="parentDelDept" parameterType="kr.or.ddit.vo.DeptVO">
+		delete from dept
+		where upper_dept_no = #{deptNo}
+	</delete>
+	
+	<!-- 부서 삭제 -->
+	<delete id="delDept" parameterType="kr.or.ddit.vo.DeptVO">
+		delete from dept
+		where dept_no = #{deptNo}
+	</delete>
+	
+	<!-- 상위부서 만들기 -->
+	<insert id="insertUpperDept" parameterType="kr.or.ddit.vo.DeptVO" useGeneratedKeys="true">
+		<selectKey order="BEFORE" keyProperty="deptNo" resultType="int">
+			select seq_dept.nextval from dual
+		</selectKey>
+		insert into dept(
+			dept_no, upper_dept_no, work_ty_no, dept_nm, dept_crt_ymd
+		)values(
+			#{deptNo}, null, null, #{deptNm}, to_char(sysdate, 'YYYYMMDD')
+		)
+	</insert>
+	
+	<!-- 하위부서 만들기 -->
+	<insert id="insertDept" parameterType="kr.or.ddit.vo.DeptVO" useGeneratedKeys="true">
+		<selectKey order="BEFORE" keyProperty="deptNo" resultType="int">
+			select seq_dept.nextval from dual
+		</selectKey>
+		insert into dept(
+			dept_no, upper_dept_no, work_ty_no, dept_nm, dept_crt_ymd
+		)values(
+			#{deptNo}, #{upperDeptNo}, null, #{deptNm}, to_char(sysdate, 'YYYYMMDD')
+		)
+	</insert>
+	
+	<!-- 부서관리 jstree 가져오기  -->
+	<select id="getUpperDeptTreeList" resultType="kr.or.ddit.vo.TreeVO">
+		select to_char(dept_no) as id,
+		       case when upper_dept_no is null then '#'
+		       end as parent, 
+		       dept_nm as text
+		from dept
+		where upper_dept_no is null
+	</select>
+	
+	
+</mapper>

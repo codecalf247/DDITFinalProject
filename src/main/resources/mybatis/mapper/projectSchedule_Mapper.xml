@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="kr.or.ddit.employee.project.mapper.IProjectScheduleMapper">
+
+
+
+
+	<!-- 일정 조회 -->
+    <select id="getProjectSchedules" parameterType="int" resultType="schdulVO">
+        SELECT 
+            SCHDUL_NO, EMP_NO, SCHDUL_TITLE, SCHDUL_CN, START_DT, END_DT, 
+            TEXT_COLOR, BACKGROUND_COLOR, ALLDAY_AT, SCHDUL_TY, PRJCT_NO, PROCS_TY
+        FROM SCHDUL
+        WHERE PRJCT_NO = #{prjctNo}
+        AND SCHDUL_TY = '11004'
+    </select>
+    
+    
+    	<!-- 일정 등록 -->
+    <insert id="createSchedule" parameterType="schdulVO">
+        <selectKey keyProperty="schdulNo" resultType="int" order="BEFORE">
+            SELECT SEQ_SCHDUL.NEXTVAL FROM DUAL
+        </selectKey>
+        INSERT INTO SCHDUL (
+            SCHDUL_NO, EMP_NO, SCHDUL_TITLE, SCHDUL_CN, START_DT, END_DT, 
+            TEXT_COLOR, BACKGROUND_COLOR, ALLDAY_AT, SCHDUL_TY, PRJCT_NO, PROCS_TY
+        ) VALUES (
+            #{schdulNo}, #{empNo}, #{schdulTitle}, #{schdulCn}, #{startDt}, #{endDt}, 
+            #{textColor}, #{backgroundColor}, 'true', '11004', #{prjctNo}, #{procsTy}
+        )
+    </insert>
+
+    
+  
+    
+
+	<!-- 일정 상세조회 -->
+	<select id="getScheduleDetail" parameterType="int" resultType="schdulVO">
+        SELECT 
+            SCHDUL_NO, EMP_NO, SCHDUL_TITLE, SCHDUL_CN, START_DT, END_DT, 
+            TEXT_COLOR, BACKGROUND_COLOR, ALLDAY_AT, SCHDUL_TY, PRJCT_NO, PROCS_TY
+        FROM SCHDUL
+        WHERE SCHDUL_NO = #{schdulNo}
+    </select>
+
+
+	<!-- 일정 업데이트 -->
+    <update id="updateSchedule" parameterType="schdulVO">
+        UPDATE SCHDUL
+        <set>
+            <if test="schdulTitle != null">SCHDUL_TITLE = #{schdulTitle},</if>
+            <if test="schdulCn != null">SCHDUL_CN = #{schdulCn},</if>
+            <if test="startDt != null">START_DT = #{startDt},</if>
+            <if test="endDt != null">END_DT = #{endDt},</if>
+            <if test="textColor != null">TEXT_COLOR = #{textColor},</if>
+            <if test="backgroundColor != null">BACKGROUND_COLOR = #{backgroundColor},</if>
+            <if test="alldayAt != null">ALLDAY_AT = #{alldayAt},</if>
+            <if test="procsTy != null">PROCS_TY = #{procsTy},</if>
+        </set>
+        WHERE SCHDUL_NO = #{schdulNo}
+    </update>
+
+
+	<!-- 일정 삭제 -->
+    <delete id="deleteSchedule" parameterType="int">
+        DELETE FROM SCHDUL
+        WHERE SCHDUL_NO = #{schdulNo}
+    </delete>
+
+ 
+</mapper>

@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.or.ddit.common.notification.mapper.INotificationMapper">
+
+  <!-- INSERT: 시퀀스로 PK 뽑고, SYSDATE로 생성시간, READ_YN=N -->
+  <insert id="insert" parameterType="kr.or.ddit.vo.NotificationVO">
+    <selectKey keyProperty="ntcnNo" resultType="long" order="BEFORE">
+      SELECT SEQ_NTCN.NEXTVAL FROM dual
+    </selectKey>
+    INSERT INTO NTCN
+      (NTCN_NO, rcver, NTCN_TY, NTCN_CN, NTCN_TRNSMIT_DT, READ_YN, NTCN_PATH)
+    VALUES
+      (#{ntcnNo}, #{rcver}, #{ntcnTy}, #{ntcnCn}, SYSDATE, 'N', #{ntcnPath})
+  </insert>
+
+  <!-- 수신자 미읽음 목록 -->
+  <select id="selectUnreadByRcvr" resultType="kr.or.ddit.vo.NotificationVO">
+    SELECT NTCN_NO, rcver, NTCN_TY, NTCN_CN, NTCN_TRNSMIT_DT, READ_YN, NTCN_PATH
+      FROM NTCN
+     WHERE rcver = #{rcver}
+       AND READ_YN = 'N'
+     ORDER BY NTCN_NO DESC
+  </select>
+
+  <!-- 수신자 미읽음 개수 -->
+  <select id="countUnread" resultType="int">
+    SELECT COUNT(*)
+      FROM NTCN
+     WHERE rcver = #{rcver}
+       AND READ_YN = 'N'
+  </select>
+
+  <!-- 읽음 처리 -->
+  <update id="markRead">
+    UPDATE NTCN
+       SET READ_YN = 'Y'
+     WHERE NTCN_NO = #{ntcnNo}
+       AND rcver = #{rcver}
+  </update>
+
+	<update id="markAllRead">
+	    UPDATE NTCN
+       SET READ_YN = 'Y'
+     WHERE rcver  = #{empNo}
+       AND READ_YN = 'N'
+	</update>
+
+</mapper>

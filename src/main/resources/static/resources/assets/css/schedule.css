@@ -1,0 +1,75 @@
+/* weekend highlighting */
+.fc-sat {
+  background-color: rgba(93,135,255,0.06) !important;   /* 토요일 배경(연한 파랑) */
+}
+.fc-sun {
+  background-color: rgba(250,137,107,0.06) !important;  /* 일요일 배경(연한 주황) */
+}
+
+/* 헤더(요일 글자 색상) */
+.fc .fc-col-header-cell.fc-sat .fc-col-header-cell-cushion,
+.fc .fc-col-header-cell.fc-sat .fc-col-header-cell-cushion * {
+  color: #5d87ff !important;   /* 토요일 텍스트 */
+}
+.fc .fc-col-header-cell.fc-sun .fc-col-header-cell-cushion,
+.fc .fc-col-header-cell.fc-sun .fc-col-header-cell-cushion * {
+  color: #fa896b !important;   /* 일요일 텍스트 */
+}
+
+/* 날짜 숫자(그리드 내부) 강조(선택사항) */
+.fc .fc-daygrid-day.fc-sat .fc-daygrid-day-number,
+.fc .fc-daygrid-day.fc-sun .fc-daygrid-day-number {
+  font-weight: 600;
+}
+
+/* 캘린더가 왼쪽 변경사항에 맞춰 넓게 차지하도록 보장 */
+.app-calendar { width:100%; min-height: 820px; }
+
+/* 작은 화면 대응 보정 */
+@media (max-width: 991.98px){
+  .app-calendar { min-height: 720px; }
+}
+
+/* ---- 사이드바 필터용 점 ---- */
+.filter-dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  margin-right: 8px;
+  vertical-align: middle;
+  flex: 0 0 auto;
+}
+
+/* Bootstrap 변수로 색 연결 (fallback 색 포함) */
+.filter-dot-primary { background-color: var(--bs-primary, #5d87ff) !important; }
+.filter-dot-success { background-color: var(--bs-success, #13deb9) !important; }
+.filter-dot-danger  { background-color: var(--bs-danger,  #fa896b) !important; }
+.filter-dot-warning { background-color: var(--bs-warning, #ffce79) !important; }
+
+/* ---- 캘린더 이벤트 내부에 넣을 작은 점 ---- */
+.event-dot {
+  display:inline-block;
+  width:8px;
+  height:8px;
+  border-radius:50%;
+  margin-right:6px;
+  vertical-align:middle;
+  flex: 0 0 auto;
+}
+
+/* 이벤트 dot 색상 (사이드바와 일치) */
+.event-dot-primary { background-color: var(--bs-primary, #5d87ff) !important; }
+.event-dot-success { background-color: var(--bs-success, #13deb9) !important; }
+.event-dot-danger  { background-color: var(--bs-danger,  #fa896b) !important; }
+.event-dot-warning { background-color: var(--bs-warning, #ffce79) !important; }
+
+/* 이벤트 아이템 텍스트와 dot 정렬 보정 (FullCalendar 버전별로 조정 가능) */
+.fc .fc-event-title, .fc .fc-title, .fc-event .fc-event-main-frame {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* 만약 dot가 안보일 경우 대비 */
+.filter-dot, .event-dot { box-shadow: 0 0 0 1px rgba(0,0,0,0.03) inset; }

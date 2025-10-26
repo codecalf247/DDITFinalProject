@@ -1,0 +1,348 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="kr.or.ddit.employee.project.mapper.IProjectTasksMapper">
+
+<!-- 결과 매핑 -->
+  <resultMap id="taskMap" type="kr.or.ddit.vo.ProjectTaskVO">
+    <id     property="taskNo"        column="TASK_NO"/>
+    <result property="prjctNo"       column="PRJCT_NO"/>
+    <result property="empNo"         column="EMP_NO"/>
+    <result property="taskCharger"   column="TASK_CHARGER"/>
+    <result property="taskTitle"     column="TASK_TITLE"/>
+    <result property="taskCn"        column="TASK_CN"/>
+    <result property="taskRegYmd"    column="TASK_REG_YMD"/>
+    <result property="taskBeginYmd"  column="TASK_BEGIN_YMD"/>
+    <result property="taskDdlnYmd"   column="TASK_DDLN_YMD"/>
+    <result property="taskMdfcnYmd"  column="TASK_MDFCN_YMD"/>
+    <result property="taskProgrs"    column="TASK_PROGRS"/>
+    <result property="taskSttus"     column="TASK_STTUS"/>
+    <result property="delYn"         column="DEL_YN"/>
+    <result property="emrgncyYn"     column="EMRGNCY_YN"/>
+    <result property="procsTy"       column="PROCS_TY"/>
+    <result property="fileGroupNo"   column="FILE_GROUP_NO"/>
+
+    <!-- 조회 편의 필드 -->
+    <result property="taskChargerNm" column="CHARGER_NM"/>
+    <result property="canEdit"       column="CAN_EDIT"/>
+    <result property="canDelete"     column="CAN_DELETE"/>
+  </resultMap>
+
+
+
+<!-- 시퀀스 -->
+  <select id="generateTaskNo" resultType="int">
+        SELECT SEQ_TASK.NEXTVAL FROM DUAL
+    </select>
+
+
+<select id="generateFileGroupNo" resultType="int">
+    SELECT SEQ_FILE_GROUP.NEXTVAL FROM DUAL
+  </select>
+
+
+
+
+
+
+<!-- 공통 WHERE (진행률 필터/검색/유형) -->
+  <sql id="TaskWhere">
+    WHERE t.DEL_YN = 'N'
+      AND t.PRJCT_NO = #{data.prjctNo}
+    <if test="data.procsTy != null and data.procsTy != ''">
+      AND t.PROCS_TY = #{data.procsTy}
+    </if>
+    <if test="searchWord != null and searchWord != ''">
+      AND (
+            t.TASK_TITLE LIKE '%' || #{searchWord} || '%'
+         OR e2.EMP_NM    LIKE '%' || #{searchWord} || '%'
+      )
+    </if>
+
+    <!-- 상태(=진행률) 분기: data.taskSttus 에 all|wait|progress|review|done 전달됨 -->
+    <choose>
+      <when test="data.taskSttus == 'wait'">
+        AND t.TASK_PROGRS = 0
+      </when>
+      <when test="data.taskSttus == 'progress'">
+        AND t.TASK_PROGRS BETWEEN 10 AND 80
+      </when>
+      <when test="data.taskSttus == 'review'">
+        AND t.TASK_PROGRS = 90
+      </when>
+      <when test="data.taskSttus == 'done'">
+        AND t.TASK_PROGRS = 100
+      </when>
+      <otherwise>
+        <!-- all: 제한 없음 -->
+      </otherwise>
+    </choose>
+  </sql>
+
+<!-- 상태 분기 없는 기본 WHERE: 프로젝트/검색어/유형만 반영 -->
+<sql id="TaskWhereBase">
+  WHERE t.DEL_YN = 'N'
+    AND t.PRJCT_NO = #{prjctNo}
+  <if test="procsTy != null and procsTy != ''">
+    AND t.PROCS_TY = #{procsTy}
+  </if>
+  <if test="searchWord != null and searchWord != ''">
+    AND ( t.TASK_TITLE LIKE '%' || #{searchWord} || '%'
+          OR e2.EMP_NM   LIKE '%' || #{searchWord} || '%')
+  </if>
+</sql>
+
+
+
+
+<!-- 목록 개수 -->
+<select id="selectTaskCount"
+        parameterType="kr.or.ddit.vo.PaginationInfoVO"
+        resultType="int">
+  SELECT COUNT(1)
+  FROM TASK t
+  LEFT JOIN EMP e2 ON e2.EMP_NO = t.TASK_CHARGER
+  <include refid="TaskWhere"/>
+</select>
+
+<!-- 전역 카운트: 상태 필터 없이 한 번에 집계 -->
+<select id="selectEachTaskCounts" parameterType="map" resultType="map">
+  SELECT
+    COUNT(*) AS ALL_COUNT,
+    SUM(CASE WHEN t.TASK_PROGRS = 0 THEN 1 ELSE 0 END)               AS WAIT_COUNT,
+    SUM(CASE WHEN t.TASK_PROGRS BETWEEN 10 AND 80 THEN 1 ELSE 0 END)  AS PROGRESS_COUNT,
+    SUM(CASE WHEN t.TASK_PROGRS = 90 THEN 1 ELSE 0 END)               AS REVIEW_COUNT,
+    SUM(CASE WHEN t.TASK_PROGRS = 100 THEN 1 ELSE 0 END)              AS DONE_COUNT
+  FROM TASK t
+  LEFT JOIN EMP e2 ON e2.EMP_NO = t.TASK_CHARGER
+  <include refid="TaskWhereBase"/>
+</select>
+
+
+
+<!-- 참여자 여부 체크 (등록/수정/삭제 권한 검증용) -->
+  <select id="checkProjectParticipant" resultType="int">
+    SELECT COUNT(1)
+      FROM PRJCT_PRTCPNT
+     WHERE PRJCT_NO = #{prjctNo}
+      AND EMP_NO = #{empNo}
+  </select>
+
+
+
+
+<!-- 목록 (ROW_NUMBER 페이징) -->
+  <select id="selectTaskAjaxList"
+        parameterType="kr.or.ddit.vo.PaginationInfoVO"
+        resultMap="taskMap">
+  SELECT x.*
+  FROM (
+    SELECT
+      ROW_NUMBER() OVER(ORDER BY t.TASK_REG_YMD DESC, t.TASK_NO DESC) AS RNUM,
+      t.TASK_NO, t.PRJCT_NO, t.EMP_NO, t.TASK_CHARGER, t.TASK_TITLE, t.TASK_CN,
+      t.TASK_REG_YMD, t.TASK_BEGIN_YMD, t.TASK_DDLN_YMD, t.TASK_MDFCN_YMD,
+      t.TASK_PROGRS, t.TASK_STTUS, t.DEL_YN, t.EMRGNCY_YN, t.PROCS_TY, t.FILE_GROUP_NO,
+      e2.EMP_NM AS CHARGER_NM,
+      CASE WHEN t.EMP_NO = #{empNo} OR t.TASK_CHARGER = #{empNo} THEN 'Y' ELSE 'N' END AS CAN_EDIT,
+      CASE WHEN t.EMP_NO = #{empNo} OR t.TASK_CHARGER = #{empNo} THEN 'Y' ELSE 'N' END AS CAN_DELETE
+    FROM TASK t
+    LEFT JOIN EMP e2 ON e2.EMP_NO = t.TASK_CHARGER
+    <include refid="TaskWhere"/>
+  ) x
+  WHERE x.RNUM BETWEEN #{startRow} AND #{endRow}
+</select>
+  
+  
+  <insert id="insertProjectParticipant">
+	  INSERT INTO PRJCT_PRTCPNT
+	    (PRJCT_NO, EMP_NO, TIMHDER_YN, PRJCT_PRTCPNT_TYPE)
+	  VALUES
+	    (#{prjctNo}, #{empNo}, #{timhderYn}, #{prtcpntType, jdbcType=VARCHAR})
+</insert>
+  
+  
+  <insert id="insertTask" parameterType="kr.or.ddit.vo.ProjectTaskVO">
+        <selectKey keyProperty="taskNo" resultType="int" order="BEFORE">
+            SELECT SEQ_TASK.NEXTVAL FROM DUAL
+        </selectKey>
+        
+        INSERT INTO TASK (
+            TASK_NO, PRJCT_NO, EMP_NO, TASK_CHARGER,
+            TASK_TITLE, TASK_CN,
+            TASK_REG_YMD, TASK_BEGIN_YMD, TASK_DDLN_YMD, TASK_MDFCN_YMD,
+            TASK_PROGRS, TASK_STTUS, DEL_YN, EMRGNCY_YN, PROCS_TY, FILE_GROUP_NO
+        ) VALUES (
+            #{taskNo}, #{prjctNo}, #{empNo}, #{taskCharger},
+            #{taskTitle}, #{taskCn},
+            #{taskRegYmd}, #{taskBeginYmd}, #{taskDdlnYmd}, #{taskMdfcnYmd},
+            #{taskProgrs}, #{taskSttus}, #{delYn}, #{emrgncyYn}, #{procsTy}, #{fileGroupNo}
+        )
+    </insert>
+
+  
+  <!-- FILES INSERT -->
+  <insert id="insertFiles" parameterType="kr.or.ddit.vo.FilesVO">
+	   <selectKey keyProperty="fileNo" resultType="int" order="BEFORE">
+	    SELECT SEQ_FILE.NEXTVAL FROM DUAL
+	  </selectKey>
+	  
+	    INSERT INTO FILES (
+	      FILE_GROUP_NO, FILE_NO, ORIGINAL_NM, FILE_UPLOADER,
+	      SAVED_NM, FILE_PATH, FILE_SIZE, FILE_FANCYSIZE, FILE_MIME, FILE_REG_DT, DEL_YN
+	    ) VALUES (
+	      #{fileGroupNo}, #{fileNo}, #{originalNm}, #{fileUploader},
+	      #{savedNm}, #{filePath}, #{fileSize}, #{fileFancysize}, #{fileMime},
+	     sysdate, 'N'
+	    )
+  </insert>
+  
+  
+  
+  
+  <!-- 단건 조회: 날짜를 화면 표시형(YYYY-MM-DD)로 변환 -->
+<select id="selectTaskByPk" resultMap="taskMap">
+  SELECT
+    t.TASK_NO, t.PRJCT_NO, t.EMP_NO, t.TASK_CHARGER, t.TASK_TITLE, t.TASK_CN,
+    t.TASK_REG_YMD,
+    CASE WHEN t.TASK_BEGIN_YMD IS NOT NULL THEN
+      TO_CHAR(TO_DATE(t.TASK_BEGIN_YMD,'YYYYMMDD'),'YYYY-MM-DD') END AS TASK_BEGIN_YMD,
+    CASE WHEN t.TASK_DDLN_YMD  IS NOT NULL THEN
+      TO_CHAR(TO_DATE(t.TASK_DDLN_YMD,'YYYYMMDD'),'YYYY-MM-DD')  END AS TASK_DDLN_YMD,
+    t.TASK_MDFCN_YMD,
+    t.TASK_PROGRS, t.TASK_STTUS, t.DEL_YN, t.EMRGNCY_YN, t.PROCS_TY, t.FILE_GROUP_NO,
+    e2.EMP_NM AS CHARGER_NM,
+    CASE WHEN t.EMP_NO = #{loginEmpNo} OR t.TASK_CHARGER = #{loginEmpNo} THEN 'Y' ELSE 'N' END AS CAN_EDIT,
+    CASE WHEN t.EMP_NO = #{loginEmpNo} OR t.TASK_CHARGER = #{loginEmpNo} THEN 'Y' ELSE 'N' END AS CAN_DELETE
+  FROM TASK t
+  LEFT JOIN EMP e2 ON e2.EMP_NO = t.TASK_CHARGER
+  WHERE t.PRJCT_NO = #{prjctNo}
+    AND t.TASK_NO  = #{taskNo}
+</select>
+
+
+
+<select id="selectFilesByGroupNo" parameterType="java.lang.Integer" resultType="kr.or.ddit.vo.FilesVO">
+  SELECT
+    FILE_GROUP_NO,
+    FILE_NO,
+    ORIGINAL_NM,
+    FILE_UPLOADER,
+    SAVED_NM,
+    FILE_PATH,
+    FILE_SIZE,
+    FILE_FANCYSIZE,
+    FILE_MIME,
+    FILE_REG_DT,
+    DEL_YN
+  FROM FILES
+  WHERE DEL_YN = 'N'
+    AND FILE_GROUP_NO = #{fileGroupNo} 
+  ORDER BY FILE_NO
+</select>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<!-- 업데이트 -->
+<update id="updateTask" parameterType="kr.or.ddit.vo.ProjectTaskVO">
+  UPDATE TASK
+     SET TASK_CHARGER = #{taskCharger},
+         TASK_TITLE   = #{taskTitle},
+         TASK_CN      = #{taskCn},
+         TASK_BEGIN_YMD = #{taskBeginYmd},
+         TASK_DDLN_YMD  = #{taskDdlnYmd},
+         TASK_MDFCN_YMD = #{taskMdfcnYmd},
+         TASK_PROGRS    = #{taskProgrs},
+         TASK_STTUS     = #{taskSttus},
+         EMRGNCY_YN     = #{emrgncyYn},
+         PROCS_TY       = #{procsTy}
+   WHERE TASK_NO  = #{taskNo}
+     AND PRJCT_NO = #{prjctNo}
+     AND DEL_YN   = 'N'
+</update>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<!-- 칸반 -->
+
+
+<!-- 칸반 초기 로딩용: 프로젝트의 일감 전체(삭제 제외/ 최신 등록순) -->
+<select id="selectTasksByProject" parameterType="int" resultMap="taskMap">
+  SELECT
+    t.TASK_NO, t.PRJCT_NO, t.EMP_NO, t.TASK_CHARGER, t.TASK_TITLE, t.TASK_CN,
+    t.TASK_REG_YMD, t.TASK_BEGIN_YMD, t.TASK_DDLN_YMD, t.TASK_MDFCN_YMD,
+    t.TASK_PROGRS, t.TASK_STTUS, t.DEL_YN, t.EMRGNCY_YN, t.PROCS_TY, t.FILE_GROUP_NO,
+    e2.EMP_NM AS CHARGER_NM,
+    /* 칸반에선 권한 비교 불필요하면 Y로 통일하거나, 필요시 작성자/담당자 비교 로직 넣어도 됨 */
+    'Y' AS CAN_EDIT,
+    'Y' AS CAN_DELETE
+  FROM TASK t
+  LEFT JOIN EMP e2 ON e2.EMP_NO = t.TASK_CHARGER
+  WHERE t.DEL_YN = 'N'
+    AND t.PRJCT_NO = #{prjctNo}
+  ORDER BY t.TASK_REG_YMD DESC, t.TASK_NO DESC
+</select>
+
+
+<!-- IProjectTasksMapper.xml -->
+<update id="updateTaskProgressAndStatus">
+  UPDATE TASK
+     SET TASK_PROGRS = #{progrs},
+         TASK_STTUS  = #{sttus},
+         TASK_MDFCN_YMD = TO_CHAR(SYSDATE,'YYYYMMDD')
+   WHERE TASK_NO  = #{taskNo}
+     AND PRJCT_NO = #{prjctNo}
+     AND DEL_YN   = 'N'
+</update>
+
+
+<!-- 단일 일감 조회 -->
+<select id="selectTask" resultType="kr.or.ddit.vo.ProjectTaskVO">
+    SELECT *
+    FROM task
+    WHERE prjct_no = #{prjctNo}
+      AND task_no = #{taskNo}
+</select>
+
+<!-- 일감 삭제 -->
+<delete id="deleteTask" parameterType="int">
+    DELETE FROM task
+    WHERE prjct_no = #{prjctNo}
+      AND task_no = #{taskNo}
+</delete>
+
+<!-- 파일 그룹 삭제 -->
+<delete id="deleteFilesByGroupNo" parameterType="int">
+    DELETE FROM files
+    WHERE file_group_no = #{fileGroupNo}
+</delete>
+
+
+
+
+
+
+
+
+
+</mapper>

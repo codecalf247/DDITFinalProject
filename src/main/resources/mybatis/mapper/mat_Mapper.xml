@@ -1,0 +1,163 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.or.ddit.manager.admat.mapper.IAdmatMapper">
+
+  <!-- 파일그룹 시퀀스 -->
+  <select id="selectNextFileGroupNo" resultType="int">
+    SELECT SEQ_FILE_GROUP.NEXTVAL FROM DUAL
+  </select>
+
+  <!-- 파일 등록 -->
+  <insert id="insertFile" parameterType="kr.or.ddit.vo.FilesVO">
+    INSERT INTO FILES
+    (
+      file_no, file_group_no, original_nm, saved_nm, file_path, file_size, file_uploader,
+      file_fancysize, file_mime, file_reg_dt, del_yn
+    )
+    VALUES
+    (
+      SEQ_FILE.NEXTVAL, #{fileGroupNo}, #{originalNm}, #{savedNm}, #{filePath}, #{fileSize},
+      #{fileUploader}, #{fileFancysize}, #{fileMime}, SYSDATE, 'N'
+    )
+  </insert>
+
+  <!-- 자재 INSERT -->
+  <insert id="insertMtril" parameterType="kr.or.ddit.vo.MtrilVO">
+    <selectKey keyProperty="mtrilId" resultType="string" order="BEFORE">
+      SELECT TO_CHAR(SEQ_MTRIL.NEXTVAL) FROM DUAL
+    </selectKey>
+    INSERT INTO MTRIL (
+      MTRIL_ID, MTRIL_TY, UNIT, MTRIL_NM, STOCK, MIN_STOCK, FILE_GROUP_NO, MTRIL_DC
+    ) VALUES (
+      #{mtrilId}, #{mtrilTy}, #{unit}, #{mtrilNm}, #{stock}, #{minStock},
+      #{fileGroupNo,jdbcType=INTEGER}, #{mtrilDc}
+    )
+  </insert>
+
+  <!-- 자재 총 개수 -->
+  <select id="selectmatCount"
+          parameterType="kr.or.ddit.vo.PaginationInfoVO"
+          resultType="int">
+    SELECT COUNT(m.mtril_id)
+      FROM MTRIL m
+    <include refid="searchMtril"/>
+  </select>
+
+  <!-- 자재 목록 (PK 내림차순, 페이징) -->
+  <select id="selectmatList"
+          parameterType="kr.or.ddit.vo.PaginationInfoVO"
+          resultType="kr.or.ddit.vo.MtrilVO">
+    SELECT b.*
+      FROM (
+        SELECT a.*,
+               ROW_NUMBER() OVER (ORDER BY a.mtrilId DESC) AS rnum
+          FROM (
+            SELECT
+              m.MTRIL_ID      AS mtrilId,
+              m.MTRIL_NM      AS mtrilNm,
+              m.FILE_GROUP_NO AS fileGroupNo,
+              m.MTRIL_TY      AS mtrilTy,
+              m.UNIT          AS unit,
+              m.STOCK         AS stock,
+              m.MIN_STOCK     AS minStock,
+              m.MTRIL_DC      AS mtrilDc,
+
+              /* 공통코드명 (자재유형/단위) */
+              cty.CMMN_CD_NM  AS mtrilTyNm,
+              cun.CMMN_CD_NM  AS unitNm,
+
+              /* 대표 파일경로 */
+              ( SELECT f.FILE_PATH
+                  FROM FILES f
+                 WHERE f.FILE_GROUP_NO = m.FILE_GROUP_NO
+                   AND NVL(f.DEL_YN,'N') = 'N'
+                   AND ROWNUM = 1
+              )               AS filePath,
+
+            
+              CASE
+                WHEN m.MIN_STOCK IS NOT NULL AND m.STOCK &lt; m.MIN_STOCK
+                  THEN 'shortage'
+                ELSE 'normal'
+              END AS stockStatus
+
+            FROM MTRIL m
+              LEFT JOIN CMMN_CD cty
+                     ON cty.CMMN_CD_GROUP_ID = '16'
+                    AND cty.CMMN_CD_ID       = m.MTRIL_TY
+              LEFT JOIN CMMN_CD cun
+                     ON cun.CMMN_CD_GROUP_ID = '14'
+                    AND cun.CMMN_CD_ID       = m.UNIT
+            <include refid="searchMtril"/>
+          ) a
+      ) b
+    <![CDATA[
+      WHERE b.rnum >= #{startRow} AND b.rnum <= #{endRow}
+    ]]>
+  </select>
+
+  <!-- 검색 조건 (상태 + 자재명) -->
+  <sql id="searchMtril">
+    <where>
+      <!-- 상태 필터: ''(전체)/'normal'/'shortage' -->
+      <if test="statusFilter != null and statusFilter != ''">
+        <choose>
+          <!-- 정상: 최소재고 미설정이거나, 재고가 최소재고 이상 -->
+          <when test="statusFilter == 'normal'">
+            AND (m.MIN_STOCK IS NULL OR m.STOCK &gt;= m.MIN_STOCK)
+          </when>
+          <!-- 부족: 최소재고가 설정되어 있고, 재고가 그보다 작음 -->
+          <when test="statusFilter == 'shortage'">
+            AND (m.MIN_STOCK IS NOT NULL AND m.STOCK &lt; m.MIN_STOCK)
+          </when>
+        </choose>
+      </if>
+
+      <!-- 검색어 (자재명 LIKE) -->
+      <if test="searchWord != null and searchWord != ''">
+        AND m.MTRIL_NM LIKE '%' || #{searchWord} || '%'
+      </if>
+    </where>
+  </sql>
+
+  <!-- 공통코드 조회 -->
+  <select id="selectCommonList" resultType="kr.or.ddit.vo.CommonCodeVO">
+    SELECT
+      CMMN_CD_ID AS cmmnCdId,
+      CMMN_CD_NM AS cmmnCdNm
+    FROM CMMN_CD
+    WHERE CMMN_CD_GROUP_ID = #{groupId}
+    ORDER BY CMMN_CD_ID
+  </select>
+
+  <!-- 파일 소프트 삭제: 파일그룹 기준 -->
+  <update id="deleteFilesByGroupNo" parameterType="int">
+    UPDATE FILES
+       SET DEL_YN = 'Y'
+     WHERE FILE_GROUP_NO = #{fileGroupNo}
+  </update>
+
+	 <!-- 자재 UPDATE (동적 SET) -->
+	  <update id="updateMtril" parameterType="kr.or.ddit.vo.MtrilVO">
+	  UPDATE MTRIL
+	  <set>
+	    <if test="mtrilTy != null and mtrilTy != ''"> MTRIL_TY = #{mtrilTy}, </if>
+	    <if test="unit    != null and unit    != ''"> UNIT     = #{unit},    </if>
+	    <if test="mtrilNm != null and mtrilNm != ''"> MTRIL_NM = #{mtrilNm}, </if>
+	
+	    STOCK = #{stock},
+	    MIN_STOCK = #{minStock},
+	
+	    <if test="fileGroupNo != null"> FILE_GROUP_NO = #{fileGroupNo}, </if>
+	    <if test="mtrilDc != null">     MTRIL_DC      = #{mtrilDc}      </if>
+	  </set>
+	  WHERE MTRIL_ID = #{mtrilId}
+	</update>
+
+
+	<delete id="deleteMtril" parameterType="string">
+	  DELETE FROM MTRIL WHERE MTRIL_ID = #{mtrilId}
+	</delete>
+
+</mapper>

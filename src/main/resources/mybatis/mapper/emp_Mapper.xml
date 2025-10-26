@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.or.ddit.jwt.mapper.IEmpMapper">
+
+	<resultMap type="kr.or.ddit.vo.EmpVO" id="empMap">
+		<result property="empNo" column="emp_no" />
+		<result property="deptNo" column="dept_no" />
+		<result property="password" column="password" />
+		<result property="jbgdCd" column="jbgd_cd" />
+		<result property="empNm" column="emp_nm" />
+		<result property="brdt" column="brdt" />
+		<result property="email" column="email" />
+		<result property="wnmpyEmail" column="wnmpy_email" />
+		<result property="telno" column="telno" />
+		<result property="extNo" column="ext_no" />
+		<result property="empZip" column="emp_zip" />
+		<result property="homeAddr" column="home_addr" />
+		<result property="homeDaddr" column="home_daddr" />
+		<result property="jncmpYmd" column="jncmp_ymd" />
+		<result property="rsgntnYmd" column="rsgntn_ymd" />
+		<result property="bankCd" column="bank_cd" />
+		<result property="actno" column="actno" />
+		<result property="dpstrNm" column="dpstr_nm" />
+		<result property="salary" column="salary" />
+		<result property="profileFilePath" column="profile_file_path" />
+		<result property="signFilePath" column="sign_file_path" />
+		<result property="userFolderUsgqty" column="user_folder_usgqty" />
+		<result property="photoKey" column="photo_key" />
+		<result property="enabled" column="enabled" />
+		<collection property="authList" resultMap="authMap"/>
+	</resultMap>
+	
+	<resultMap type="kr.or.ddit.vo.EmpAuthVO" id="authMap">
+		<result property="authNm" column="authNm" />
+	</resultMap>
+	
+	<select id="readByUserInfo" parameterType="string" resultMap="empMap">
+		select
+		    e.emp_no, dept_no, password, jbgd_cd, emp_nm, brdt, email, wnmpy_email, telno, ext_no, emp_zip, home_addr, home_daddr,
+		    jncmp_ymd, rsgntn_ymd, bank_cd, actno, dpstr_nm, salary, profile_file_path, sign_file_path, user_folder_usgqty, photo_key, enabled
+		from emp e 
+		left outer join auth au on (e.emp_no = au.emp_no)
+		where e.emp_no = #{empNo}
+		and e.enabled =1 
+	</select>
+
+	<select id="signin" parameterType="kr.or.ddit.vo.EmpVO" resultMap="empMap">
+		select
+		    e.emp_no, dept_no, password, jbgd_cd, emp_nm, brdt, email, wnmpy_email, telno, ext_no, emp_zip, home_addr, home_daddr,
+		    jncmp_ymd, rsgntn_ymd, bank_cd, actno, dpstr_nm, salary, profile_file_path, sign_file_path, user_folder_usgqty, photo_key, enabled
+		from emp e 
+		left outer join auth au on (e.emp_no = au.emp_no)
+		where e.emp_no = #{empNo}
+		and e.enabled =1 
+	</select>
+
+
+</mapper>
+
+
+
+
+

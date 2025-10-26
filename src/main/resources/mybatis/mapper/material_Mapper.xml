@@ -1,0 +1,132 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.or.ddit.employee.facilities.mapper.IMatMapper">
+
+	<!-- 파일그룹 시퀀스 -->
+  <select id="selectFileGroupNo" resultType="int">
+    SELECT SEQ_FILE_GROUP.NEXTVAL FROM DUAL
+  </select>
+  
+  
+  <!-- 자재 총 개수 -->
+  <select id="selectmaterialCount"
+          parameterType="kr.or.ddit.vo.PaginationInfoVO"
+          resultType="int">
+    SELECT COUNT(m.mtril_id)
+      FROM MTRIL m
+    <include refid="searchMatril"/>
+  </select>
+
+  <!-- 자재 목록 (PK 내림차순, 페이징) -->
+  <select id="selectmaterialList"
+          parameterType="kr.or.ddit.vo.PaginationInfoVO"
+          resultType="kr.or.ddit.vo.MtrilVO">
+    SELECT b.*
+      FROM (
+        SELECT a.*,
+               ROW_NUMBER() OVER (ORDER BY a.mtrilId DESC) AS rnum
+          FROM (
+            SELECT
+              m.MTRIL_ID      AS mtrilId,
+              m.MTRIL_NM      AS mtrilNm,
+              m.FILE_GROUP_NO AS fileGroupNo,
+              m.MTRIL_TY      AS mtrilTy,
+              m.UNIT          AS unit,
+              m.STOCK         AS stock,
+              m.MIN_STOCK     AS minStock,
+              m.MTRIL_DC      AS mtrilDc,
+              
+              cty.CMMN_CD_NM  AS mtrilTyNm,
+              cun.CMMN_CD_NM  AS unitNm,
+
+              ( SELECT f.FILE_PATH
+                  FROM FILES f
+                 WHERE f.FILE_GROUP_NO = m.FILE_GROUP_NO
+                   AND NVL(f.DEL_YN,'N') = 'N'
+                   AND ROWNUM = 1
+              )               AS filePath,
+
+            
+              CASE
+                WHEN m.MIN_STOCK IS NOT NULL AND m.STOCK &lt; m.MIN_STOCK
+                  THEN 'shortage'
+                ELSE 'normal'
+              END AS stockStatus
+
+            FROM MTRIL m
+              LEFT JOIN CMMN_CD cty
+                     ON cty.CMMN_CD_GROUP_ID = '16'
+                    AND cty.CMMN_CD_ID       = m.MTRIL_TY
+              LEFT JOIN CMMN_CD cun
+                     ON cun.CMMN_CD_GROUP_ID = '14'
+                    AND cun.CMMN_CD_ID       = m.UNIT
+            <include refid="searchMatril"/>
+          ) a
+      ) b
+    <![CDATA[
+      WHERE b.rnum >= #{startRow} AND b.rnum <= #{endRow}
+    ]]>
+  </select>
+
+  <!-- 검색 조건 (상태 + 자재명) -->
+  <sql id="searchMatril">
+    <where>
+      <!-- 상태 필터: ''(전체)/'normal'/'shortage' -->
+      <if test="statusFilter != null and statusFilter != ''">
+        <choose>
+          <!-- 정상: 최소재고 미설정이거나, 재고가 최소재고 이상 -->
+          <when test="statusFilter == 'normal'">
+            AND (m.MIN_STOCK IS NULL OR m.STOCK &gt;= m.MIN_STOCK)
+          </when>
+          <!-- 부족: 최소재고가 설정되어 있고, 재고가 그보다 작음 -->
+          <when test="statusFilter == 'shortage'">
+            AND (m.MIN_STOCK IS NOT NULL AND m.STOCK &lt; m.MIN_STOCK)
+          </when>
+        </choose>
+      </if>
+
+      <!-- 검색어 (자재명 LIKE) -->
+      <if test="searchWord != null and searchWord != ''">
+        AND m.MTRIL_NM LIKE '%' || #{searchWord} || '%'
+      </if>
+    </where>
+  </sql>
+
+  <!-- 공통코드 조회 -->
+  <select id="selectCmList" resultType="kr.or.ddit.vo.CommonCodeVO">
+    SELECT
+      CMMN_CD_ID AS cmmnCdId,
+      CMMN_CD_NM AS cmmnCdNm
+    FROM CMMN_CD
+    WHERE CMMN_CD_GROUP_ID = #{groupId}
+    ORDER BY CMMN_CD_ID
+  </select>
+  
+  <!-- 재고 증가 (입고) -->
+  <update id="updateStockPlus" parameterType="kr.or.ddit.vo.MtrilVO">
+    UPDATE MTRIL
+       SET STOCK = NVL(STOCK,0) + #{inoutQy}
+     WHERE MTRIL_ID = #{mtrilId}
+  </update>
+
+  <!-- 재고 안전 감소 (출고) : 부족 시 0행 업데이트 -->
+  <update id="updateStockMinusSafe" parameterType="kr.or.ddit.vo.MtrilVO">
+     UPDATE MTRIL
+     SET STOCK = NVL(STOCK,0) - #{inoutQy}
+   WHERE MTRIL_ID = #{mtrilId}
+     AND NVL(STOCK,0) &gt;= #{inoutQy}
+  </update>
+
+  <!-- 입출고 이력 기록 -->
+  <insert id="insertHist" parameterType="kr.or.ddit.vo.MtrilVO">
+    INSERT INTO MTRIL_HIST
+      ( MTRIL_HIST_NO , MTRIL_ID , EMP_NO, INOUT_TY , INOUT_QY , INOUT_DT , SPT_NM , MEMO )
+    VALUES
+      ( SEQ_MTRIL_HIST.NEXTVAL
+      , #{mtrilId}, #{empNo} , #{inoutTy} , #{inoutQy} , SYSDATE , #{sptNm, jdbcType=VARCHAR}
+      , #{memo,  jdbcType=VARCHAR} )
+  </insert>
+  
+  
+  
+</mapper>

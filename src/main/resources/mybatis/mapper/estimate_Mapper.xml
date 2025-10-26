@@ -1,0 +1,180 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.or.ddit.employee.project.mapper.IEstimateMapper">
+
+	<resultMap id="prqudoMap" type="prqudoVO">
+		<id property="prqudoNo" column="PRQUDO_NO" />
+		<result property="empNo" column="EMP_NO" />
+		<result property="prjctNo" column="PRJCT_NO" />
+		<result property="prqudoTitle" column="PRQUDO_TITLE" />
+		<result property="prqudoCn" column="PRQUDO_CN" />
+		<result property="estmtAmount" column="ESTMT_AMOUNT" />
+		<result property="fileGroupNo" column="FILE_GROUP_NO" />
+		<result property="regDt" column="REG_DT" />	
+		<result property="empNm" column="EMP_NM" />	
+		
+		<collection property="fileList"
+			ofType="kr.or.ddit.vo.FilesVO">
+			<id property="fileNo" column="FILE_NO" />
+			<result property="fileGroupNo" column="FILE_GROUP_NO" />
+			<result property="originalNm" column="ORIGINAL_NM" />
+			<result property="savedNm" column="SAVED_NM" />
+			<result property="filePath" column="FILE_PATH" />
+			<result property="fileSize" column="FILE_SIZE" />
+			<result property="fileFancysize" column="FILE_FANCYSIZE" />
+			<result property="fileMime" column="FILE_MIME" />
+			<result property="fileRegDt" column="FILE_REG_DT" />
+			<result property="delYn" column="DEL_YN_FILE" />
+			<result property="fileUploader" column="FILE_UPLOADER" />
+		</collection>
+	</resultMap>
+
+	<!-- 견적서 목록 조회 -->
+		<select id="estimateList" parameterType="int" resultMap="prqudoMap">
+		SELECT
+		    A.PRQUDO_NO, A.EMP_NO, A.PRQUDO_TITLE, A.ESTMT_AMOUNT, A.REG_DT, A.FILE_GROUP_NO,
+		    B.FILE_NO, B.FILE_GROUP_NO, B.ORIGINAL_NM, B.SAVED_NM, B.FILE_PATH,
+		    B.FILE_SIZE, B.FILE_FANCYSIZE, B.FILE_MIME, B.FILE_REG_DT, B.DEL_YN AS DEL_YN_FILE, B.FILE_UPLOADER,
+		    C.EMP_NM
+		FROM
+		    PRQUDO A 
+		    LEFT JOIN FILES B ON A.FILE_GROUP_NO = B.FILE_GROUP_NO
+		    LEFT JOIN EMP C ON A.EMP_NO = C.EMP_NO 
+		WHERE
+		    A.PRJCT_NO = #{prjctNo}
+		ORDER BY
+		    A.REG_DT DESC
+	</select>
+	
+	<!-- 파일 그룹번호 생성 -->
+	<select id="generateFileGroupNo" resultType="int">
+		SELECT SEQ_FILE_GROUP.NEXTVAL FROM dual
+	</select>
+	
+	<!-- 파일 생성 -->
+	<insert id="insertFile" parameterType="kr.or.ddit.vo.FilesVO">
+		INSERT INTO files (
+		file_no, file_group_no, original_nm, saved_nm, file_size, file_path,
+		file_uploader,
+		file_fancysize, file_mime, file_reg_dt, del_yn
+		) VALUES (
+		SEQ_FILE.NEXTVAL, #{fileGroupNo}, #{originalNm}, #{savedNm}, #{fileSize}, #{filePath},
+		#{fileUploader},
+		#{fileFancysize}, #{fileMime}, SYSDATE, 'N'
+		)
+	</insert>
+	
+		<!-- 견적서 등록 -->
+	<insert id="insert" parameterType="kr.or.ddit.vo.PrqudoVO">
+		<selectKey keyProperty="prqudoNo" resultType="int" order="BEFORE">
+			SELECT SEQ_PRQUDO.NEXTVAL FROM dual
+		</selectKey>
+		INSERT INTO PRQUDO (
+		  PRQUDO_NO
+		, EMP_NO
+		, PRJCT_NO
+		, PRQUDO_TITLE
+		, PRQUDO_CN
+		, ESTMT_AMOUNT
+		, FILE_GROUP_NO
+		, REG_DT
+		) VALUES (
+		  #{prqudoNo}
+		, #{empNo}
+		, #{prjctNo}
+		, #{prqudoTitle}
+		, #{prqudoCn}
+		, #{estmtAmount}
+		, #{fileGroupNo}
+		, SYSDATE
+		)
+	</insert>
+		
+	<!-- 견적서 상세 조회 -->
+	<!-- 견적서 상세 조회 -->
+<select id="selectEstimate" parameterType="int" resultMap="prqudoMap">
+    SELECT
+        A.PRQUDO_NO,
+        A.EMP_NO,
+        A.PRJCT_NO,
+        A.PRQUDO_TITLE,
+        A.PRQUDO_CN,
+        A.ESTMT_AMOUNT,
+        A.FILE_GROUP_NO,
+        A.REG_DT,
+        B.FILE_NO,
+        B.ORIGINAL_NM,
+        B.SAVED_NM,
+        B.FILE_PATH,
+        B.FILE_SIZE,
+        B.FILE_FANCYSIZE,
+        B.FILE_MIME,
+        B.FILE_REG_DT,
+        B.DEL_YN AS DEL_YN_FILE,
+        B.FILE_UPLOADER,
+        C.EMP_NM
+    FROM
+        PRQUDO A 
+        LEFT OUTER JOIN FILES B 
+            ON A.FILE_GROUP_NO = B.FILE_GROUP_NO
+            AND B.DEL_YN = 'N' 
+        LEFT OUTER JOIN EMP C 
+            ON A.EMP_NO = C.EMP_NO
+    WHERE
+        A.PRQUDO_NO = #{prqudoNo}
+</select>
+
+	
+	<!-- 견적서 수정 -->
+	<update id="estimateUpdate" parameterType="prqudoVO">
+		UPDATE PRQUDO
+		SET
+			PRQUDO_TITLE = #{prqudoTitle},
+			PRQUDO_CN = #{prqudoCn},
+			ESTMT_AMOUNT = #{estmtAmount},
+			FILE_GROUP_NO = #{fileGroupNo}
+		WHERE
+			PRQUDO_NO = #{prqudoNo}
+	</update>
+	
+	<update id="updateFileDelYn" parameterType="int">
+		UPDATE files
+		SET DEL_YN = 'Y'
+		WHERE file_no = #{fileNo}
+	</update>
+	
+	<!-- 견적서에 파일 그룹번호 업데이트 -->
+	<update id="updateFileGroupNo" parameterType="prqudoVO">
+		UPDATE PRQUDO
+		SET
+			FILE_GROUP_NO = #{fileGroupNo}
+		WHERE
+			PRQUDO_NO = #{prqudoNo}
+	</update>
+	
+		<!-- 파일 삭제 -->
+	<update id="deleteFile" parameterType="int">
+		UPDATE FILES SET
+			DEL_YN = 'Y'
+		WHERE
+			FILE_NO = #{fileNo}
+	</update>
+
+	
+	<!-- 파일 그룹 전체 논리적 삭제 -->
+	<update id="deleteFileGroupNo" parameterType="int">
+		UPDATE FILES SET
+			DEL_YN = 'Y'
+		WHERE
+			FILE_GROUP_NO = #{fileGroupNo}
+	</update>
+	
+	<!-- 견적서 삭제 -->
+	<delete id="deleteEstimate" parameterType="int">
+		DELETE FROM PRQUDO
+		WHERE
+			PRQUDO_NO = #{prqudoNo}
+	</delete>
+	
+
+</mapper>

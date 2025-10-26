@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.or.ddit.jwt.mapper.IBlogMapper">
+
+	<resultMap type="kr.or.ddit.vo.BlogVO" id="blogMap">
+		<id property="blogNo" column="blog_no"/>
+		<result property="blogNo" column="blog_no"/>
+		<result property="blogTitle" column="blog_title"/>
+		<result property="blogContent" column="blog_content"/>
+		<result property="blogWriter" column="blog_writer"/>
+		<result property="blogDate" column="blog_date"/>
+		<result property="blogHit" column="blog_hit"/>
+		<result property="memProfileimg" column="mem_profileimg"/>
+		<result property="fileCnt" column="file_cnt"/>
+		<collection property="blogFileList" resultMap="blogFileMap"/>
+	</resultMap>
+	
+	<resultMap type="kr.or.ddit.vo.BlogFileVO" id="blogFileMap">
+		<id property="fileNo" column="file_no"/>
+		<result property="fileNo" column="file_no"/>
+		<result property="fileName" column="file_name"/>
+		<result property="fileSavepath" column="file_savepath"/>
+		<result property="fileFancysize" column="file_fancysize"/>
+	</resultMap>
+
+	<insert id="insert" parameterType="kr.or.ddit.vo.BlogVO" useGeneratedKeys="true">
+		<selectKey keyProperty="blogNo" resultType="int" order="BEFORE">
+			select seq_blog.nextval from dual
+		</selectKey>
+		insert into blog(
+			blog_no, blog_title, blog_content, blog_writer, blog_date, blog_hit
+		)values(
+			#{blogNo},#{blogTitle},#{blogContent},#{blogWriter},sysdate,0
+		)
+	</insert>
+	
+	<insert id="insertBlogFile" parameterType="kr.or.ddit.vo.BlogFileVO">
+		insert into blogfile(
+			file_no, blog_no, file_name, file_size, file_fancysize, file_mime, file_savepath, file_downcount
+		)values(
+			seq_blogfile.nextval, #{blogNo},#{fileName},#{fileSize},#{fileFancysize},#{fileMime},#{fileSavepath},0
+		)
+	</insert>
+
+	<select id="selectBlogCount" parameterType="kr.or.ddit.vo.PaginationInfoVO" resultType="int">
+		select count(*) from blog
+	</select>
+
+	<select id="selectBlogList" parameterType="kr.or.ddit.vo.PaginationInfoVO" resultMap="blogMap">
+		select b.*
+		from(
+			select
+				a.*, row_number() over (order by a.blog_no desc) rnum
+			from(
+				select
+					b.blog_no, blog_title, blog_content, blog_writer, blog_date, blog_hit,
+					(select mem_profileimg from blogmember bm where b.blog_writer = bm.mem_id) mem_profileimg,
+					(select count(blog_no) from blogfile bbf where b.blog_no = bbf.blog_no) file_cnt,
+					file_savepath
+				from blog b left outer join blogfile bf on(b.blog_no = bf.blog_no)
+				order by b.blog_no desc
+			) a
+		) b
+	</select>
+
+	<update id="incrementHit" parameterType="int">
+		update blog
+		set 
+			blog_hit = blog_hit+1
+		where blog_no = #{blogNo}
+	</update>
+
+	<select id="detail" parameterType="int" resultMap="blogMap">
+						select
+					b.blog_no, blog_title, blog_content, blog_writer, blog_date, blog_hit,
+					(select mem_profileimg from blogmember bm where b.blog_writer = bm.mem_id) mem_profileimg,
+					(select count(blog_no) from blogfile bbf where b.blog_no = bbf.blog_no) file_cnt,
+					file_no,file_savepath, file_name, file_fancysize
+				from blog b left outer join blogfile bf on(b.blog_no = bf.blog_no)
+                where b.blog_no = #{blogNo}
+	</select>
+
+	<select id="getFileInfo" parameterType="int" resultType="kr.or.ddit.vo.BlogFileVO">
+		select
+			file_no, blog_no, file_name, file_size, file_fancysize, file_mime, file_savepath, file_downcount
+		from blogfile
+		where file_no = #{fileNo}
+	</select>
+
+
+
+
+</mapper>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

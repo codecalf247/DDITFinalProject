@@ -1,0 +1,217 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="kr.or.ddit.employee.project.mapper.IProjectPhotosMapper">
+
+ <resultMap type="kr.or.ddit.vo.ProjectPhotosVO" id="projectPhotosMap">
+        <id property="sptPhotoNo" column="SPT_PHOTO_NO"/>
+        <result property="prjctNo" column="PRJCT_NO"/>
+        <result property="empNo" column="EMP_NO"/>
+        <result property="sptPhotoTitle" column="SPT_PHOTO_TITLE"/>
+        <result property="sptPhotoYmd" column="SPT_PHOTO_YMD"/>
+        <result property="fileGroupNo" column="FILE_GROUP_NO"/>
+        <result property="thumbnailPath" column="THUMBNAIL_PATH" />
+        <result property="procsTy" column="PROCS_TY" />
+        
+        <collection property="categories" ofType="java.lang.String">
+             <result column="CMMN_CD_NM" />
+        </collection>
+
+        <collection property="fileList" ofType="kr.or.ddit.vo.FilesVO">
+            <id property="fileNo" column="FILE_NO"/>
+            <result property="fileGroupNo" column="FILE_GROUP_NO"/>
+            <result property="originalNm" column="ORIGINAL_NM"/>
+            <result property="savedNm" column="SAVED_NM"/>
+            <result property="filePath" column="FILE_PATH"/>
+            <result property="fileSize" column="FILE_SIZE"/>
+            <result property="fileFancysize" column="FILE_FANCYSIZE"/>
+            <result property="fileMime" column="FILE_MIME"/>
+        </collection>
+    </resultMap>
+
+
+	<!-- 번호 발급 -->
+    <select id="generateFileGroupNo" resultType="int">
+        SELECT SEQ_FILE_GROUP.NEXTVAL FROM DUAL
+    </select>
+
+
+	<!-- 등록 -->
+    <insert id="insertPhoto" parameterType="kr.or.ddit.vo.ProjectPhotosVO">
+        <selectKey keyProperty="sptPhotoNo" resultType="int" order="BEFORE">
+            SELECT SEQ_SPT_PHOTO.NEXTVAL FROM DUAL
+        </selectKey>
+        INSERT INTO SPT_PHOTO (
+            SPT_PHOTO_NO, PRJCT_NO, EMP_NO, SPT_PHOTO_TITLE, PROCS_TY, SPT_PHOTO_YMD, FILE_GROUP_NO
+        ) VALUES (
+            #{sptPhotoNo}, #{prjctNo}, #{empNo}, #{sptPhotoTitle}, #{procsTy}, TO_CHAR(SYSDATE, 'YYYYMMDD'), #{fileGroupNo}
+        )
+    </insert>
+
+    <insert id="insertFiles" parameterType="kr.or.ddit.vo.FilesVO">
+        INSERT INTO FILES(
+            FILE_GROUP_NO, FILE_NO, ORIGINAL_NM, FILE_UPLOADER, SAVED_NM, FILE_PATH, 
+            FILE_SIZE, FILE_FANCYSIZE, FILE_MIME, FILE_REG_DT, DEL_YN    
+        ) VALUES (
+            #{fileGroupNo}, SEQ_FILE.NEXTVAL, #{originalNm}, #{fileUploader}, #{savedNm}, #{filePath}, #{fileSize}, 
+            #{fileFancysize}, #{fileMime}, SYSDATE, 'N'
+        )
+    </insert>
+
+
+
+<!-- Paging -->
+
+
+ <sql id="searchPhotos">
+		<if test="searchWord != null and searchWord != ''">
+			AND A.SPT_PHOTO_TITLE LIKE '%' || #{searchWord} || '%'
+		</if>
+	</sql>
+  
+  <select id="selectPhotoCount" parameterType="kr.or.ddit.vo.PaginationInfoVO" resultType="int">
+      SELECT COUNT(A.SPT_PHOTO_NO)
+      FROM SPT_PHOTO A
+      WHERE A.PRJCT_NO = #{data.prjctNo}
+      <include refid="searchPhotos"></include>
+  </select>
+
+  <select id="selectPhotoListWithPaging" 
+          parameterType="kr.or.ddit.vo.PaginationInfoVO" 
+          resultMap="projectPhotosMap">
+    SELECT a.*
+    FROM (
+      SELECT
+        ROW_NUMBER() OVER (ORDER BY b.SPT_PHOTO_NO DESC) rnum,
+        b.SPT_PHOTO_NO,
+        b.PRJCT_NO,
+        b.EMP_NO,
+        b.SPT_PHOTO_TITLE,
+        b.SPT_PHOTO_YMD,
+        b.FILE_GROUP_NO,
+        b.PROCS_TY,
+        (SELECT '/upload/' || F.SAVED_NM
+           FROM FILES F
+          WHERE F.FILE_GROUP_NO = b.FILE_GROUP_NO
+            AND F.DEL_YN = 'N'
+            AND ROWNUM = 1) AS THUMBNAIL_PATH,
+        C.CMMN_CD_NM
+      FROM SPT_PHOTO b
+      LEFT JOIN CMMN_CD C
+        ON INSTR(',' || B.PROCS_TY || ',', ',' || C.CMMN_CD_ID || ',') > 0
+      WHERE b.PRJCT_NO = #{data.prjctNo}
+      <include refid="searchPhotos"></include>
+    ) a
+    <![CDATA[
+    WHERE a.rnum BETWEEN #{startRow} AND #{endRow}
+    ]]>
+  </select>
+  
+
+
+
+
+
+
+	 <!-- ========== 목록 ========== -->
+	  <select id="selectPhotoList" parameterType="int" resultMap="projectPhotosMap">
+	    SELECT
+	      A.SPT_PHOTO_NO,
+	      A.PRJCT_NO,
+	      A.EMP_NO,
+	      A.SPT_PHOTO_TITLE,
+	      A.SPT_PHOTO_YMD,
+	      A.FILE_GROUP_NO,
+	      A.PROCS_TY,
+	      (SELECT '/upload/' || F.SAVED_NM
+	         FROM FILES F
+	        WHERE F.FILE_GROUP_NO = A.FILE_GROUP_NO
+	          AND F.DEL_YN = 'N'
+	          AND ROWNUM = 1) AS THUMBNAIL_PATH,
+	      C.CMMN_CD_NM
+	    FROM SPT_PHOTO A
+	    LEFT JOIN CMMN_CD C
+	      ON INSTR(',' || A.PROCS_TY || ',', ',' || C.CMMN_CD_ID || ',') > 0
+	    WHERE A.PRJCT_NO = #{prjctNo}
+	    ORDER BY A.SPT_PHOTO_NO DESC
+	  </select>
+
+     <!-- ========== 상세 ========== -->
+    <select id="selectPhotoDetail" parameterType="int" resultMap="projectPhotosMap">
+	  SELECT
+	      A.SPT_PHOTO_NO, A.PRJCT_NO, A.EMP_NO, A.SPT_PHOTO_TITLE, A.SPT_PHOTO_YMD, A.FILE_GROUP_NO, A.PROCS_TY,
+	      B.FILE_NO, B.ORIGINAL_NM, B.SAVED_NM, B.FILE_PATH, B.FILE_SIZE, B.FILE_FANCYSIZE, B.FILE_MIME,
+	      C.CMMN_CD_NM
+	  FROM SPT_PHOTO A
+	  LEFT JOIN FILES B
+	         ON A.FILE_GROUP_NO = B.FILE_GROUP_NO
+	        AND B.DEL_YN = 'N'
+	  LEFT JOIN CMMN_CD C
+	         ON INSTR(',' || A.PROCS_TY || ',', ',' || C.CMMN_CD_ID || ',') > 0
+	  WHERE A.SPT_PHOTO_NO = #{photoNo}
+</select>
+    
+    
+
+    
+    
+    
+    <!-- 기본정보(제목/공정유형) 수정 -->
+    <update id="updatePhotoBasic" parameterType="kr.or.ddit.vo.ProjectPhotosVO">
+    	update 
+    		spt_photo
+    	set 
+    		spt_photo_title = #{sptPhotoTitle},
+    		procs_ty = #{procsTy}, 
+    		spt_photo_ymd   = spt_photo_ymd 
+  		where spt_photo_no = #{sptPhotoNo}
+     	and prjct_no = #{prjctNo}
+    
+    </update>
+    
+    
+    
+    <!-- 물리삭제용 정보 조회 -->
+	<select id="selectFilesByNos" parameterType="java.util.List" resultType="kr.or.ddit.vo.FilesVO">
+	  SELECT FILE_GROUP_NO, FILE_NO, ORIGINAL_NM, FILE_UPLOADER, SAVED_NM, FILE_PATH,
+	         FILE_SIZE, FILE_FANCYSIZE, FILE_MIME, FILE_REG_DT, DEL_YN
+	    FROM FILES
+	   WHERE FILE_NO IN
+	   <foreach collection="list" item="no" open="(" separator="," close=")">
+	     #{no}
+	   </foreach>
+</select>
+    
+    
+    
+    <!-- 파일 번호들 del_yn='Y' -->
+	<update id="deleteFilesByNos" parameterType="java.util.List">
+	  UPDATE FILES
+	     SET DEL_YN = 'Y'
+	   WHERE FILE_NO IN
+	   <foreach collection="list" item="no" open="(" separator="," close=")">
+	     #{no}
+	   </foreach>
+	</update>
+	
+	
+	<!-- ✅ sptPhotoNo 기준 파일번호들(DEL_YN='N') -->
+	<select id="selectFileNosBySptPhotoNo" parameterType="int" resultType="int">
+	  SELECT F.FILE_NO
+	    FROM FILES F
+	   WHERE F.FILE_GROUP_NO = (
+	           SELECT A.FILE_GROUP_NO
+	             FROM SPT_PHOTO A
+	            WHERE A.SPT_PHOTO_NO = #{photoNo}
+	         )
+	     AND F.DEL_YN = 'N'
+	</select>
+
+	<!-- ✅ 사진 묶음 삭제 -->
+	<delete id="deletePhoto" parameterType="int">
+	  DELETE FROM SPT_PHOTO
+	   WHERE SPT_PHOTO_NO = #{photoNo}
+	</delete>
+	
+</mapper>

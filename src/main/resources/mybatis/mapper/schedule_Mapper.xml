@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.or.ddit.employee.schedule.mapper.IScheduleMapper">
+	
+	<insert id="insertSchedule" parameterType="kr.or.ddit.vo.SchdulVO">
+	
+	insert into SCHDUL 
+	(
+	SCHDUL_NO
+	,EMP_NO
+	,SCHDUL_TITLE
+	,SCHDUL_CN
+	,START_DT
+	,END_DT
+	,TEXT_COLOR
+	,BACKGROUND_COLOR
+	,ALLDAY_AT
+	,SCHDUL_TY
+	,DEPT_NO
+	,PRJCT_NO
+	)values(
+	SEQ_SCHDUL.NEXTVAL
+	,#{empNo}
+	,#{schdulTitle}
+	,#{schdulCn}
+	,TO_DATE(#{startDt}, 'YYYY-MM-DD HH24:MI:SS')
+	,TO_DATE(#{endDt},   'YYYY-MM-DD HH24:MI:SS')
+	,#{textColor}
+	,#{backgroundColor}
+	,#{alldayAt}
+	,#{schdulTy}
+	,#{deptNo}
+	,#{prjctNo}
+	
+	)
+	</insert>
+
+	<select id="getSchedule" parameterType="int" resultType="kr.or.ddit.vo.SchdulVO">
+		select *
+		from SCHDUL
+		where SCHDUL_no = #{id}
+	</select>
+
+	<delete id="deleteSchedule">
+		delete from schdul
+		where schdul_no = #{id}
+	</delete>
+
+
+</mapper>

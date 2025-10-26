@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.or.ddit.login.mapper.ILoginMapper">
+
+	<resultMap type="kr.or.ddit.vo.EmpVO" id="empMap">
+		<id property="empNo" column="emp_no"/>
+		<result property="empNo" column="emp_no"/>
+		<result property="deptNo" column="dept_no"/>
+		<result property="password" column="PASSWORD"/>
+		<result property="jbgdCd" column="JBGD_CD"/>
+		<result property="empNm" column="EMP_NM"/>
+		<result property="brdt" column="BRDT"/>
+		<result property="email" column="EMAIL"/>
+		<result property="wnmpyEmail" column="WNMPY_EMAIL"/>
+		<result property="telno" column="TELNO"/>
+		<result property="extNo" column="EXT_NO"/>
+		<result property="empZip" column="EMP_ZIP"/>
+		<result property="homeAddr" column="HOME_ADDR"/>
+		<result property="homeDaddr" column="HOME_DADDR"/>
+		<result property="jncmpYmd" column="JNCMP_YMD"/>
+		<result property="rsgntnYmd" column="RSGNTN_YMD"/>
+		<result property="bankCd" column="BANK_CD"/>
+		<result property="actno" column="ACTNO"/>
+		<result property="dpstrNm" column="DPSTR_NM"/>
+		<result property="salary" column="SALARY"/>
+		<result property="profileFilePath" column="PROFILE_FILE_PATH"/>
+		<result property="signFilePath" column="SIGN_FILE_PATH"/>
+		<result property="userFolderUsgqty" column="USER_FOLDER_USGQTY"/>
+		<result property="photoKey" column="PHOTO_KEY"/>
+		<result property="enabled" column="ENABLED"/>
+		<result property="upperDeptNo" column="upper_dept_no"/>
+		<result property="workTyNo" column="work_ty_no"/>
+		<result property="deptNm" column="dept_nm"/>
+		<collection property="authList" resultMap="authMap" />
+	</resultMap>
+	
+	<resultMap type="kr.or.ddit.vo.EmpAuthVO" id="authMap">
+		<result property="empNo" column="emp_no"/>
+		<result property="authNm" column="auth_nm"/>
+	</resultMap>
+	
+
+	<select id="readByUserInfo" parameterType="string" resultMap="empMap">
+			SELECT ep.*,at.auth_nm,upper_dept_no,work_ty_no,dept_nm
+		FROM emp ep
+		LEFT OUTER JOIN auth AT
+		    ON EP.EMP_NO = AT.EMP_NO
+        LEFT OUTER JOIN dept dt
+            ON EP.DEPT_NO = DT.DEPT_NO
+		WHERE ep.emp_no = #{username}
+	</select>
+
+	<select id="findId" parameterType="kr.or.ddit.vo.EmpVO" resultType="string">
+		select emp_no
+		from emp
+		where emp_nm = #{empNm}
+		and brdt = #{brdt}
+	</select>
+
+	<select id="checkPw" parameterType="kr.or.ddit.vo.EmpVO">
+		select count(*)
+		from emp
+		where emp_no = #{empNo}
+		and email = #{email}
+	</select>
+
+	<update id="changePw" parameterType="kr.or.ddit.vo.EmpVO">
+		update emp
+		set password = #{password}
+		where emp_no = #{empNo}
+		and email = #{email}
+	</update>
+
+</mapper>

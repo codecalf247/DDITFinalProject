@@ -1,0 +1,1017 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.or.ddit.employee.attendance.mapper.IAttendanceMapper">
+	
+	<resultMap type="kr.or.ddit.vo.attendance.WorkHistVO" id="workHistMap">
+		<result property="workHistNo" column="work_hist_no" />
+		<result property="workRcordNo" column="work_rcord_no" />
+		<result property="workSttus" column="work_sttus" />
+		<result property="histDt" column="hist_dt" />
+		<result property="requstResn" column="requst_resn" />
+	
+		<association property="workRcordVO" javaType="kr.or.ddit.vo.attendance.WorkRcordVO">
+	<!-- 		<result property="workRcordNo" column="workRcordNo" /> -->
+			<result property="empNo" column="emp_no" />
+			<result property="workYmd" column="work_ymd" />
+			<result property="beginTime" column="begin_time" />
+			<result property="endTime" column="end_time" />
+	<!-- 		<result property="workSttus" column="workSttus" /> -->
+			<result property="empNm" column="emp_nm" />
+			<result property="workTimeMin" column="workTimeMin" />
+			<result property="overTimeMin" column="overTimeMin" />
+			<result property="dayOfTheWeek" column="dayOfTheWeek" />
+	
+		</association>
+	
+	</resultMap>
+	
+	
+	<select id="getWeeklyWorkRecord" parameterType="map" resultType="kr.or.ddit.vo.attendance.WorkRcordVO">
+		SELECT DISTINCT
+		    wr.work_rcord_no, 
+		    wr.emp_no, 
+		    TO_CHAR(TO_DATE(wr.work_ymd,'YYYYMMDD'), 'YYYY-MM-DD') AS work_ymd, 
+		    NVL2(begin_time, SUBSTR(begin_time, 1, 2) || ':' || SUBSTR(begin_time, 3, 2), '--:--') AS begin_time,
+		    NVL2(end_time, SUBSTR(end_time, 1, 2) || ':' || SUBSTR(end_time, 3, 2), '--:--') AS end_time,
+		    cmd.cmmn_cd_nm AS work_sttus,
+		    e.emp_nm,
+		    TO_CHAR(TO_DATE(wr.work_ymd,'YYYYMMDD'), 'DY') AS dayOfTheWeek,
+		
+		    -- 일별 근무시간 (분)
+		    CASE 
+		      WHEN end_time IS NOT NULL AND begin_time IS NOT NULL THEN 
+			  CASE 
+			      WHEN ( (TO_NUMBER(SUBSTR(end_time,1,2))*60 + TO_NUMBER(SUBSTR(end_time,3,2))) 
+			           - (TO_NUMBER(SUBSTR(begin_time,1,2))*60 + TO_NUMBER(SUBSTR(begin_time,3,2))) ) >= 300
+			      THEN ( (TO_NUMBER(SUBSTR(end_time,1,2))*60 + TO_NUMBER(SUBSTR(end_time,3,2))) 
+			           - (TO_NUMBER(SUBSTR(begin_time,1,2))*60 + TO_NUMBER(SUBSTR(begin_time,3,2))) ) - 60
+			      ELSE ( (TO_NUMBER(SUBSTR(end_time,1,2))*60 + TO_NUMBER(SUBSTR(end_time,3,2))) 
+			           - (TO_NUMBER(SUBSTR(begin_time,1,2))*60 + TO_NUMBER(SUBSTR(begin_time,3,2))) )
+			    END
+		      ELSE 0
+		    END AS workTimeMin,
+		
+		    -- 승인된 연장근무 시간 (없으면 0)
+		    CASE 
+		         WHEN sd.doc_process_sttus = '09003' THEN
+		             CASE 
+		                 -- 정규 근무제: 18시 이후
+		                 WHEN wt.work_ty_no = 1 AND wr.begin_time IS NOT NULL AND wr.end_time IS NOT NULL    
+		                 THEN GREATEST(0, (TO_NUMBER(SUBSTR(end_time, 1, 2)) * 60 + TO_NUMBER(SUBSTR(end_time, 3, 2)) - 1080))
+		                 -- 유연 근무제: 9시간 초과
+		                 WHEN wt.work_ty_no = 2 AND wr.begin_time IS NOT NULL AND wr.end_time IS NOT NULL
+		                 THEN GREATEST(
+		                          0,
+		                          (TO_NUMBER(SUBSTR(end_time,1,2))*60 + TO_NUMBER(SUBSTR(end_time,3,2)))
+		                        - (TO_NUMBER(SUBSTR(begin_time,1,2))*60 + TO_NUMBER(SUBSTR(begin_time,3,2)))
+		                        - 540
+		                      )
+		             END
+		         ELSE 0
+		    END AS overTimeMin,
+		
+		    -- 주간 총 근무시간
+		    SUM(
+		      CASE 
+		        WHEN end_time IS NOT NULL AND begin_time IS NOT NULL
+		        THEN (TO_NUMBER(SUBSTR(end_time,1,2))*60 + TO_NUMBER(SUBSTR(end_time,3,2)))
+		           - (TO_NUMBER(SUBSTR(begin_time,1,2))*60 + TO_NUMBER(SUBSTR(begin_time,3,2)))
+		        ELSE 0
+		      END
+		    ) OVER(PARTITION BY wr.emp_no) AS allWorkTimeMin,
+		
+		    -- 주간 평균 근무시간
+		    ROUND(
+		      AVG(
+		        CASE 
+		          WHEN end_time IS NOT NULL AND begin_time IS NOT NULL THEN 
+		            CASE 
+				      WHEN ( (TO_NUMBER(SUBSTR(end_time,1,2))*60 + TO_NUMBER(SUBSTR(end_time,3,2))) 
+				           - (TO_NUMBER(SUBSTR(begin_time,1,2))*60 + TO_NUMBER(SUBSTR(begin_time,3,2))) ) >= 300
+				      THEN ( (TO_NUMBER(SUBSTR(end_time,1,2))*60 + TO_NUMBER(SUBSTR(end_time,3,2))) 
+				           - (TO_NUMBER(SUBSTR(begin_time,1,2))*60 + TO_NUMBER(SUBSTR(begin_time,3,2))) ) - 60
+				      ELSE ( (TO_NUMBER(SUBSTR(end_time,1,2))*60 + TO_NUMBER(SUBSTR(end_time,3,2))) 
+				           - (TO_NUMBER(SUBSTR(begin_time,1,2))*60 + TO_NUMBER(SUBSTR(begin_time,3,2))) )
+				    END
+		        END
+		      ) OVER(PARTITION BY wr.emp_no)
+		    ) AS avgWorkTimeMin,
+		
+		    -- 출근일수 / 지각횟수
+		    COUNT(CASE WHEN begin_time IS NOT NULL and end_time IS NOT NULL THEN 1 END) OVER(PARTITION BY wr.emp_no) AS countWork,
+		    COUNT(CASE WHEN wr.work_sttus = '01002' and begin_time IS NOT NULL THEN 1 END) OVER(PARTITION BY wr.emp_no) AS countLate
+		
+		FROM work_rcord wr
+		INNER JOIN emp e ON e.emp_no = wr.emp_no
+		INNER JOIN dept d ON e.dept_no = d.dept_no
+		INNER JOIN work_ty wt ON d.work_ty_no = wt.work_ty_no
+		INNER JOIN cmmn_cd cmd ON wr.work_sttus = cmd.cmmn_cd_id
+		LEFT JOIN sanctn_doc sd 
+		       ON sd.emp_no = wr.emp_no 
+		      AND TO_CHAR(sd.wrt_dt, 'YYYYMMDD') = wr.work_ymd 
+		      AND sd.form_no = 103
+		WHERE wr.emp_no = #{empNo}
+		  AND TO_DATE(WORK_YMD,'YYYYMMDD') 
+		      BETWEEN TRUNC(TO_DATE(#{formatDay},'YYYYMMDD'),'IW') 
+		          AND TRUNC(TO_DATE(#{formatDay},'YYYYMMDD'),'IW') + 6
+		ORDER BY work_ymd
+		
+	</select>
+	
+	<select id="getMonthlyWorkRecord" parameterType="map" resultType="kr.or.ddit.vo.attendance.WorkWeekRcordVO">
+		SELECT
+	    t.week,
+	    COUNT(CASE WHEN t.begin_time IS NOT NULL AND t.end_time IS NOT NULL THEN 1 END) AS countWork,
+	    COUNT(CASE WHEN t.work_sttus = '01002' AND t.begin_time IS NOT NULL THEN 1 END) AS countLate,
+	    SUM(
+	        CASE 
+	            WHEN t.end_time IS NOT NULL AND t.begin_time IS NOT NULL THEN 
+	              CASE 
+				      WHEN ( (TO_NUMBER(SUBSTR(end_time,1,2))*60 + TO_NUMBER(SUBSTR(end_time,3,2))) 
+				           - (TO_NUMBER(SUBSTR(begin_time,1,2))*60 + TO_NUMBER(SUBSTR(begin_time,3,2))) ) >= 300
+				      THEN ( (TO_NUMBER(SUBSTR(end_time,1,2))*60 + TO_NUMBER(SUBSTR(end_time,3,2))) 
+				           - (TO_NUMBER(SUBSTR(begin_time,1,2))*60 + TO_NUMBER(SUBSTR(begin_time,3,2))) ) - 60
+				      ELSE ( (TO_NUMBER(SUBSTR(end_time,1,2))*60 + TO_NUMBER(SUBSTR(end_time,3,2))) 
+				           - (TO_NUMBER(SUBSTR(begin_time,1,2))*60 + TO_NUMBER(SUBSTR(begin_time,3,2))) )
+				    END
+	            ELSE 0
+	        END
+	    ) as workTimeMin,
+	    AVG(
+	        CASE
+	            WHEN t.end_time IS NOT NULL AND t.begin_time IS NOT NULL THEN 
+	            	  CASE 
+					      WHEN ( (TO_NUMBER(SUBSTR(end_time,1,2))*60 + TO_NUMBER(SUBSTR(end_time,3,2))) 
+					           - (TO_NUMBER(SUBSTR(begin_time,1,2))*60 + TO_NUMBER(SUBSTR(begin_time,3,2))) ) >= 300
+					      THEN ( (TO_NUMBER(SUBSTR(end_time,1,2))*60 + TO_NUMBER(SUBSTR(end_time,3,2))) 
+					           - (TO_NUMBER(SUBSTR(begin_time,1,2))*60 + TO_NUMBER(SUBSTR(begin_time,3,2))) ) - 60
+					      ELSE ( (TO_NUMBER(SUBSTR(end_time,1,2))*60 + TO_NUMBER(SUBSTR(end_time,3,2))) 
+					           - (TO_NUMBER(SUBSTR(begin_time,1,2))*60 + TO_NUMBER(SUBSTR(begin_time,3,2))) )
+					    END
+	            ELSE NULL
+	        END
+	    ) AS avgWorkTimeMin
+	FROM (
+	    SELECT
+	        TO_NUMBER(TO_CHAR(TO_DATE(WORK_YMD,'YYYYMMDD'),'IW'))
+	          - TO_NUMBER(TO_CHAR(TO_DATE(#{formatDay},'YYYYMMDD'),'IW')) + 1 as week,
+	        work_sttus,
+	        begin_time,
+	        end_time
+	    FROM work_rcord
+	    WHERE TO_DATE(WORK_YMD,'YYYYMMDD')
+	          BETWEEN TO_DATE(#{formatDay},'YYYYMMDD') 
+	              AND LAST_DAY(TO_DATE(#{formatDay},'YYYYMMDD'))
+	      AND emp_no = #{empNo}
+	) t
+	GROUP BY t.week
+	ORDER BY t.week
+	</select>
+	
+	<select id="getRangeWorkHistory" parameterType="kr.or.ddit.vo.attendance.PaginationAttdInfoVO" resultMap="workHistMap">
+      SELECT DISTINCT b.*
+      	FROM (SELECT a.*, row_number() over(order by a.work_ymd desc) rnum
+        		FROM ( SELECT
+			                wh.work_hist_no, wh.work_rcord_no, wh.hist_dt,
+			                wr.emp_no, 
+			                TO_CHAR(TO_DATE(wr.work_ymd,'YYYYMMDD'), 'YYYY-MM-DD') AS work_ymd, 
+			                NVL2(begin_time, SUBSTR(begin_time, 1, 2) || ':' || SUBSTR(begin_time, 3, 2), '--:--') AS begin_time,
+			                NVL2(end_time, SUBSTR(end_time, 1, 2) || ':' || SUBSTR(end_time, 3, 2), '--:--') AS end_time,
+			                cmd.cmmn_cd_nm AS work_sttus,
+			                e.emp_nm,
+			                TO_CHAR(TO_DATE(wr.work_ymd,'YYYYMMDD'), 'DY') AS dayOfTheWeek,
+			            
+			                -- 일별 근무시간 (분)
+			                CASE 
+			                  WHEN end_time IS NOT NULL AND begin_time IS NOT NULL THEN 
+			                    CASE 
+							      WHEN ( (TO_NUMBER(SUBSTR(end_time,1,2))*60 + TO_NUMBER(SUBSTR(end_time,3,2))) 
+							           - (TO_NUMBER(SUBSTR(begin_time,1,2))*60 + TO_NUMBER(SUBSTR(begin_time,3,2))) ) >= 300
+							      THEN ( (TO_NUMBER(SUBSTR(end_time,1,2))*60 + TO_NUMBER(SUBSTR(end_time,3,2))) 
+							           - (TO_NUMBER(SUBSTR(begin_time,1,2))*60 + TO_NUMBER(SUBSTR(begin_time,3,2))) ) - 60
+							      ELSE ( (TO_NUMBER(SUBSTR(end_time,1,2))*60 + TO_NUMBER(SUBSTR(end_time,3,2))) 
+							           - (TO_NUMBER(SUBSTR(begin_time,1,2))*60 + TO_NUMBER(SUBSTR(begin_time,3,2))) )
+							    END
+			                  ELSE 0
+			                END AS workTimeMin,
+			            
+			                -- 승인된 연장근무 시간 (없으면 0)
+			                CASE 
+			                     WHEN sd.doc_process_sttus = '09003' THEN
+			                         CASE 
+			                             -- 정규 근무제: 18시 이후
+			                             WHEN wt.work_ty_no = 1 AND wr.begin_time IS NOT NULL AND wr.end_time IS NOT NULL    
+			                             THEN GREATEST(0, (TO_NUMBER(SUBSTR(end_time, 1, 2)) * 60 + TO_NUMBER(SUBSTR(end_time, 3, 2)) - 1080))
+			                             -- 유연 근무제: 9시간 초과
+			                             WHEN wt.work_ty_no = 2 AND wr.begin_time IS NOT NULL AND wr.end_time IS NOT NULL
+			                             THEN GREATEST(
+			                                      0,
+			                                      (TO_NUMBER(SUBSTR(end_time,1,2))*60 + TO_NUMBER(SUBSTR(end_time,3,2)))
+			                                    - (TO_NUMBER(SUBSTR(begin_time,1,2))*60 + TO_NUMBER(SUBSTR(begin_time,3,2)))
+			                                    - 540
+			                                  )
+			                         END
+			                     ELSE 0
+			                END AS overTimeMin,
+			                whmr.requst_resn
+			            
+			            FROM work_hist wh
+			            INNER JOIN work_rcord wr ON wr.work_rcord_no = wh.work_rcord_no
+			            INNER JOIN emp e ON e.emp_no = wr.emp_no
+			            INNER JOIN dept d ON e.dept_no = d.dept_no
+			            INNER JOIN work_ty wt ON d.work_ty_no = wt.work_ty_no
+			            INNER JOIN cmmn_cd cmd ON wh.work_sttus = cmd.cmmn_cd_id
+			            LEFT JOIN sanctn_doc sd 
+			                   ON sd.emp_no = wr.emp_no 
+			                  AND TO_CHAR(sd.wrt_dt, 'YYYYMMDD') = wr.work_ymd 
+			                  AND sd.form_no = 103
+			            LEFT JOIN work_hist_mdfnc_requst whmr on whmr.work_rcord_no = wr.work_rcord_no
+			            WHERE wr.emp_no = #{empNo}
+			              AND TO_DATE(WORK_YMD,'YYYYMMDD') 
+			                  BETWEEN TO_DATE(#{startDay},'YYYYMMDD') AND TO_DATE(#{endDay},'YYYYMMDD')
+			                 <if test="searchType != null and searchType != 'all'">
+			                    AND wh.work_sttus = #{searchType}
+			                </if>    
+			            ORDER BY work_ymd 
+			            ) a 
+			        ) b
+			        <![CDATA[
+						where b.rnum >= #{startRow} and b.rnum <= #{endRow}
+					]]>
+	</select>
+	
+	<select id="getWorkHistoryCount" parameterType="kr.or.ddit.vo.attendance.PaginationAttdInfoVO" resultType="int">
+		SELECT 
+	       COUNT(work_hist_no)
+	    FROM work_hist wh
+	    INNER JOIN work_rcord wr ON wr.work_rcord_no = wh.work_rcord_no
+	    WHERE wr.emp_no = #{empNo}
+	      AND hist_dt BETWEEN TO_DATE(#{startDay},'YYYYMMDD') AND TO_DATE(#{endDay},'YYYYMMDD')
+	       <if test="searchType != null and searchType != 'all'">
+	           AND wh.work_sttus = #{searchType}
+	       </if>    
+	</select>
+	
+	<insert id="insertRequest" parameterType="kr.or.ddit.vo.attendance.WorkHistMdfncRequstVO">
+		INSERT INTO work_hist_mdfnc_requst (
+		    work_hist_mdfnc_requst_no,
+		    work_rcord_no,
+		    requst_resn,
+		    requst_reg_ymd,
+		    requst_time,
+		    file_group_no,
+		    requst_ty,
+		    requst_sttus,
+		    return_resn
+		) VALUES (
+		    SEQ_WORK_HIST_MDFNC_REQUST.nextVal,
+		    #{workRcordNo},
+		    #{requstResn},
+		    TO_CHAR(SYSDATE, 'YYYYMMDD'),
+		    #{requstTime},
+		    #{fileGroupNo},
+		    #{requstTy},
+		    '22002',
+		    null
+		)
+	</insert>
+	
+	<select id="getRequest" parameterType="int" resultType="kr.or.ddit.vo.attendance.WorkHistMdfncRequstVO">
+		SELECT DISTINCT
+		    work_hist_mdfnc_requst_no,
+		    work_rcord_no,
+		    requst_resn,
+		    requst_reg_ymd,
+		    requst_time,
+		    wr.file_group_no,
+		    requst_ty,
+		    cmd.cmmn_cd_nm as requst_sttus,
+		    return_resn,
+		    saved_nm,
+		    original_nm
+		FROM
+		    work_hist_mdfnc_requst wr
+		INNER JOIN cmmn_cd cmd on (wr.requst_sttus = cmd.cmmn_cd_id)
+		LEFT OUTER JOIN files f on (wr.file_group_no = f.file_group_no)
+		WHERE work_rcord_no = #{workRcordNo}
+	</select>
+	
+	<select id="getExcelData" parameterType="kr.or.ddit.vo.attendance.PaginationAttdInfoVO" resultMap="workHistMap">
+      	SELECT DISTINCT a.*, row_number() over(order by a.work_ymd asc) rnum
+    	FROM ( SELECT
+               wh.work_hist_no, wh.work_rcord_no, 
+               TO_CHAR(wh.hist_dt,'YYYY-MM-DD') as hist_dt,
+               wr.emp_no, 
+               TO_CHAR(TO_DATE(wr.work_ymd,'YYYYMMDD'), 'YYYY-MM-DD') AS work_ymd, 
+               NVL2(begin_time, SUBSTR(begin_time, 1, 2) || ':' || SUBSTR(begin_time, 3, 2), '--:--') AS begin_time,
+               NVL2(end_time, SUBSTR(end_time, 1, 2) || ':' || SUBSTR(end_time, 3, 2), '--:--') AS end_time,
+               cmd.cmmn_cd_nm AS work_sttus,
+               e.emp_nm,
+               TO_CHAR(TO_DATE(wr.work_ymd,'YYYYMMDD'), 'DY') AS dayOfTheWeek,
+           
+               -- 일별 근무시간 (분)
+               CASE 
+                 WHEN end_time IS NOT NULL AND begin_time IS NOT NULL THEN 
+                   CASE 
+				      WHEN ( (TO_NUMBER(SUBSTR(end_time,1,2))*60 + TO_NUMBER(SUBSTR(end_time,3,2))) 
+				           - (TO_NUMBER(SUBSTR(begin_time,1,2))*60 + TO_NUMBER(SUBSTR(begin_time,3,2))) ) >= 300
+				      THEN ( (TO_NUMBER(SUBSTR(end_time,1,2))*60 + TO_NUMBER(SUBSTR(end_time,3,2))) 
+				           - (TO_NUMBER(SUBSTR(begin_time,1,2))*60 + TO_NUMBER(SUBSTR(begin_time,3,2))) ) - 60
+				      ELSE ( (TO_NUMBER(SUBSTR(end_time,1,2))*60 + TO_NUMBER(SUBSTR(end_time,3,2))) 
+				           - (TO_NUMBER(SUBSTR(begin_time,1,2))*60 + TO_NUMBER(SUBSTR(begin_time,3,2))) )
+				    END
+                 ELSE 0
+               END AS workTimeMin,
+           
+               -- 승인된 연장근무 시간 (없으면 0)
+               CASE 
+                    WHEN sd.doc_process_sttus = '09003' THEN
+                        CASE 
+                            -- 정규 근무제: 18시 이후
+                            WHEN wt.work_ty_no = 1 AND wr.begin_time IS NOT NULL AND wr.end_time IS NOT NULL    
+                            THEN GREATEST(0, (TO_NUMBER(SUBSTR(end_time, 1, 2)) * 60 + TO_NUMBER(SUBSTR(end_time, 3, 2)) - 1080))
+                            -- 유연 근무제: 9시간 초과
+                            WHEN wt.work_ty_no = 2 AND wr.begin_time IS NOT NULL AND wr.end_time IS NOT NULL
+                            THEN GREATEST(
+                                     0,
+                                     (TO_NUMBER(SUBSTR(end_time,1,2))*60 + TO_NUMBER(SUBSTR(end_time,3,2)))
+                                   - (TO_NUMBER(SUBSTR(begin_time,1,2))*60 + TO_NUMBER(SUBSTR(begin_time,3,2)))
+                                   - 540
+                                 )
+                        END
+                    ELSE 0
+               END AS overTimeMin,
+               whmr.requst_resn
+           
+           FROM work_hist wh
+           INNER JOIN work_rcord wr ON wr.work_rcord_no = wh.work_rcord_no
+           INNER JOIN emp e ON e.emp_no = wr.emp_no
+           INNER JOIN dept d ON e.dept_no = d.dept_no
+           INNER JOIN work_ty wt ON d.work_ty_no = wt.work_ty_no
+           INNER JOIN cmmn_cd cmd ON wh.work_sttus = cmd.cmmn_cd_id
+           LEFT JOIN sanctn_doc sd 
+                  ON sd.emp_no = wr.emp_no 
+                 AND TO_CHAR(sd.wrt_dt, 'YYYYMMDD') = wr.work_ymd 
+                 AND sd.form_no = 103
+           LEFT JOIN work_hist_mdfnc_requst whmr on whmr.work_rcord_no = wr.work_rcord_no
+           WHERE wr.emp_no = #{empNo}
+             AND TO_DATE(WORK_YMD,'YYYYMMDD') 
+                 BETWEEN TO_DATE(#{startDay},'YYYY-MM-DD') AND TO_DATE(#{endDay},'YYYY-MM-DD')
+                <if test="searchType != null and searchType != 'all'">
+                   AND wh.work_sttus = #{searchType}
+               </if>    
+           ORDER BY work_ymd asc
+           ) a 
+	</select>
+	
+	<select id="getVacation" parameterType="map" resultType="kr.or.ddit.vo.attendance.YrycSttusVO">
+		SELECT
+		    yryc_sttus_no,
+		    ys.emp_no,
+		    emp_nm,
+		    issu_yr,
+		    tot_yryc_co,
+		    use_co,
+		    TO_CHAR(start_dt,'YYYY-MM-DD') as start_dt,
+		    TO_CHAR(end_dt,'YYYY-MM-DD') as end_dt,
+		    NVL(SUM(use_co) OVER (PARTITION BY ys.emp_no, issu_yr), 0) AS all_use_co
+		FROM
+		    yryc_sttus ys
+		INNER JOIN emp e ON ys.emp_no = e.emp_no 
+		WHERE ys.emp_no = #{empNo}
+		     AND issu_yr = #{year}
+		ORDER BY start_dt desc
+	</select>
+	
+	
+	<select id="getDeptList">
+		SELECT
+		    dept_no,
+		    upper_dept_no,
+		    work_ty_no,
+		    dept_nm,
+		    dept_crt_ymd
+		FROM
+		    dept
+		WHERE upper_dept_no IS NOT NULL
+	</select>
+	
+	<select id="getCompanyWorkRecord" parameterType="kr.or.ddit.vo.attendance.PaginationAttdInfoVO" resultType="kr.or.ddit.vo.attendance.WorkRcordVO">
+		SELECT b.*
+		FROM (
+			SELECT a.*, row_number() over(order by a.work_ymd asc) rnum
+			FROM
+				(SELECT DISTINCT
+				    wr.work_rcord_no, 
+				    wr.emp_no, 
+				    TO_CHAR(TO_DATE(wr.work_ymd,'YYYYMMDD'), 'YYYY-MM-DD') AS work_ymd, 
+				    NVL2(begin_time, SUBSTR(begin_time, 1, 2) || ':' || SUBSTR(begin_time, 3, 2), '--:--') AS begin_time,
+				    NVL2(end_time, SUBSTR(end_time, 1, 2) || ':' || SUBSTR(end_time, 3, 2), '--:--') AS end_time,
+				    cmd.cmmn_cd_nm AS work_sttus,
+				    e.emp_nm,
+				    dept_nm,
+				    work_ty_nm,
+				    TO_CHAR(TO_DATE(wr.work_ymd,'YYYYMMDD'), 'DY') AS dayOfTheWeek,
+				
+				    -- 일별 근무시간 (분)
+				    CASE 
+				      WHEN end_time IS NOT NULL AND begin_time IS NOT NULL THEN 
+				        CASE 
+					      WHEN ( (TO_NUMBER(SUBSTR(end_time,1,2))*60 + TO_NUMBER(SUBSTR(end_time,3,2))) 
+					           - (TO_NUMBER(SUBSTR(begin_time,1,2))*60 + TO_NUMBER(SUBSTR(begin_time,3,2))) ) >= 300
+					      THEN ( (TO_NUMBER(SUBSTR(end_time,1,2))*60 + TO_NUMBER(SUBSTR(end_time,3,2))) 
+					           - (TO_NUMBER(SUBSTR(begin_time,1,2))*60 + TO_NUMBER(SUBSTR(begin_time,3,2))) ) - 60
+					      ELSE ( (TO_NUMBER(SUBSTR(end_time,1,2))*60 + TO_NUMBER(SUBSTR(end_time,3,2))) 
+					           - (TO_NUMBER(SUBSTR(begin_time,1,2))*60 + TO_NUMBER(SUBSTR(begin_time,3,2))) )
+					    END
+				      ELSE 0
+				    END AS workTimeMin,
+				
+				    -- 승인된 연장근무 시간 (없으면 0)
+				    CASE 
+				         WHEN sd.doc_process_sttus = '09003' THEN
+				             CASE 
+				                 -- 정규 근무제: 18시 이후
+				                 WHEN wt.work_ty_no = 1 AND wr.begin_time IS NOT NULL AND wr.end_time IS NOT NULL    
+				                 THEN GREATEST(0, (TO_NUMBER(SUBSTR(end_time, 1, 2)) * 60 + TO_NUMBER(SUBSTR(end_time, 3, 2)) - 1080))
+				                 -- 유연 근무제: 9시간 초과
+				                 WHEN wt.work_ty_no = 2 AND wr.begin_time IS NOT NULL AND wr.end_time IS NOT NULL
+				                 THEN GREATEST(
+				                          0,
+				                          (TO_NUMBER(SUBSTR(end_time,1,2))*60 + TO_NUMBER(SUBSTR(end_time,3,2)))
+				                        - (TO_NUMBER(SUBSTR(begin_time,1,2))*60 + TO_NUMBER(SUBSTR(begin_time,3,2)))
+				                        - 540
+				                      )
+				             END
+				         ELSE 0
+				    END AS overTimeMin,
+		    
+				
+				    -- 출근일수 / 지각횟수 / 연차일수
+				    COUNT(CASE WHEN begin_time IS NOT NULL and end_time IS NOT NULL THEN 1 END) OVER() AS countWork,
+				    COUNT(CASE WHEN wr.work_sttus = '01002' and begin_time IS NOT NULL THEN 1 END) OVER() AS countLate,
+		            COUNT(CASE WHEN wr.work_sttus = '01003' THEN 1 END) OVER() AS countAnnualLeave		
+				
+				FROM work_rcord wr
+				INNER JOIN emp e ON e.emp_no = wr.emp_no
+				INNER JOIN dept d ON e.dept_no = d.dept_no
+				INNER JOIN work_ty wt ON d.work_ty_no = wt.work_ty_no
+				INNER JOIN cmmn_cd cmd ON wr.work_sttus = cmd.cmmn_cd_id
+				LEFT JOIN sanctn_doc sd 
+				       ON sd.emp_no = wr.emp_no 
+				      AND TO_CHAR(sd.wrt_dt, 'YYYYMMDD') = wr.work_ymd 
+				      AND sd.form_no = 103
+				<![CDATA[
+				WHERE WORK_YMD >= #{startDay} AND WORK_YMD <= #{endDay} 
+				]]>
+				<if test="empNm != null and empNm != ''">
+					AND e.emp_nm LIKE '%' || #{empNm} || '%'
+				</if>
+				<if test="deptNo != null and deptNo != ''">
+					AND e.dept_no = #{deptNo}
+				</if>
+				<if test="status != null and status != ''">
+					AND wr.work_sttus = #{status}
+				</if>
+				ORDER BY work_ymd desc
+				) a
+			) b
+		    <![CDATA[
+			WHERE b.rnum >= #{startRow} AND b.rnum <= #{endRow}
+			]]>
+	</select>
+	
+	<select id="getHeadCount" parameterType="kr.or.ddit.vo.attendance.PaginationAttdInfoVO" resultType="int">
+		
+		SELECT COUNT(*) AS company_count
+		FROM EMP
+        <![CDATA[
+		WHERE JNCMP_YMD <= #{endDay}
+		  AND (RSGNTN_YMD IS NULL OR RSGNTN_YMD >= #{startDay})
+		]]>
+
+	</select>
+	
+	<select id="getCompanyWorkRecordCount" parameterType="kr.or.ddit.vo.attendance.PaginationAttdInfoVO" resultType="int">
+		SELECT 
+	       COUNT(work_rcord_no)
+	    FROM work_rcord wr
+	    INNER JOIN emp e ON (wr.emp_no = e.emp_no)
+       	<![CDATA[
+		WHERE WORK_YMD >= #{startDay} AND WORK_YMD <= #{endDay} 
+		]]>
+		<if test="empNm != null and empNm != ''">
+			AND emp_nm LIKE '%' || #{empNm} || '%'
+		</if>
+		<if test="deptNo != null and deptNo != ''">
+			AND dept_no = #{deptNo}
+		</if>
+		<if test="status != null and status != ''">
+			AND work_sttus = #{status}
+		</if>
+	</select>
+	
+	<select id="getCompanyAttendanceExcelData" parameterType="kr.or.ddit.vo.attendance.PaginationAttdInfoVO" resultType="kr.or.ddit.vo.attendance.WorkRcordVO">
+			SELECT 
+			    wr.work_rcord_no, 
+			    wr.emp_no, 
+			    TO_CHAR(TO_DATE(wr.work_ymd,'YYYYMMDD'), 'YYYY-MM-DD') AS work_ymd, 
+			    NVL2(begin_time, SUBSTR(begin_time, 1, 2) || ':' || SUBSTR(begin_time, 3, 2), '--:--') AS begin_time,
+			    NVL2(end_time, SUBSTR(end_time, 1, 2) || ':' || SUBSTR(end_time, 3, 2), '--:--') AS end_time,
+			    cmd.cmmn_cd_nm AS work_sttus,
+			    e.emp_nm,
+			    dept_nm,
+			    work_ty_nm,
+			    TO_CHAR(TO_DATE(wr.work_ymd,'YYYYMMDD'), 'DY') AS dayOfTheWeek,
+			
+			    -- 일별 근무시간 (분)
+			    CASE 
+			      WHEN end_time IS NOT NULL AND begin_time IS NOT NULL THEN 
+			        CASE 
+				      WHEN ( (TO_NUMBER(SUBSTR(end_time,1,2))*60 + TO_NUMBER(SUBSTR(end_time,3,2))) 
+				           - (TO_NUMBER(SUBSTR(begin_time,1,2))*60 + TO_NUMBER(SUBSTR(begin_time,3,2))) ) >= 300
+				      THEN ( (TO_NUMBER(SUBSTR(end_time,1,2))*60 + TO_NUMBER(SUBSTR(end_time,3,2))) 
+				           - (TO_NUMBER(SUBSTR(begin_time,1,2))*60 + TO_NUMBER(SUBSTR(begin_time,3,2))) ) - 60
+				      ELSE ( (TO_NUMBER(SUBSTR(end_time,1,2))*60 + TO_NUMBER(SUBSTR(end_time,3,2))) 
+				           - (TO_NUMBER(SUBSTR(begin_time,1,2))*60 + TO_NUMBER(SUBSTR(begin_time,3,2))) )
+				    END
+			      ELSE 0
+			    END AS workTimeMin,
+			
+			    -- 승인된 연장근무 시간 (없으면 0)
+			    CASE 
+			         WHEN sd.doc_process_sttus = '09003' THEN
+			             CASE 
+			                 -- 정규 근무제: 18시 이후
+			                 WHEN wt.work_ty_no = 1 AND wr.begin_time IS NOT NULL AND wr.end_time IS NOT NULL    
+			                 THEN GREATEST(0, (TO_NUMBER(SUBSTR(end_time, 1, 2)) * 60 + TO_NUMBER(SUBSTR(end_time, 3, 2)) - 1080))
+			                 -- 유연 근무제: 9시간 초과
+			                 WHEN wt.work_ty_no = 2 AND wr.begin_time IS NOT NULL AND wr.end_time IS NOT NULL
+			                 THEN GREATEST(
+			                          0,
+			                          (TO_NUMBER(SUBSTR(end_time,1,2))*60 + TO_NUMBER(SUBSTR(end_time,3,2)))
+			                        - (TO_NUMBER(SUBSTR(begin_time,1,2))*60 + TO_NUMBER(SUBSTR(begin_time,3,2)))
+			                        - 540
+			                      )
+			             END
+			         ELSE 0
+			    END AS overTimeMin,
+	    
+			
+			    -- 출근일수 / 지각횟수 / 연차일수
+			    COUNT(CASE WHEN begin_time IS NOT NULL and end_time IS NOT NULL THEN 1 END) OVER() AS countWork,
+			    COUNT(CASE WHEN wr.work_sttus = '01002' and begin_time IS NOT NULL THEN 1 END) OVER() AS countLate,
+	            COUNT(CASE WHEN wr.work_sttus = '01003' THEN 1 END) OVER() AS countAnnualLeave		
+			
+			FROM work_rcord wr
+			INNER JOIN emp e ON e.emp_no = wr.emp_no
+			INNER JOIN dept d ON e.dept_no = d.dept_no
+			INNER JOIN work_ty wt ON d.work_ty_no = wt.work_ty_no
+			INNER JOIN cmmn_cd cmd ON wr.work_sttus = cmd.cmmn_cd_id
+			LEFT JOIN sanctn_doc sd 
+			       ON sd.emp_no = wr.emp_no 
+			      AND TO_CHAR(sd.wrt_dt, 'YYYYMMDD') = wr.work_ymd 
+			      AND sd.form_no = 103
+			<![CDATA[
+			WHERE WORK_YMD >= #{startDay} AND WORK_YMD <= #{endDay} 
+			]]>
+			<if test="empNm != null and empNm != ''">
+				AND e.emp_nm LIKE '%' || #{empNm} || '%'
+			</if>
+			<if test="deptNo != null and deptNo != ''">
+				AND e.dept_no = #{deptNo}
+			</if>
+			<if test="status != null and status != ''">
+				AND wr.work_sttus = #{status}
+			</if>
+			ORDER BY work_ymd desc
+	</select>
+	
+	<select id="companyDeptAnalytics" parameterType="map" resultType="kr.or.ddit.vo.attendance.CompanyAnalyticsVO">
+		SELECT 
+		    upper_dept_no as deptNo,
+		    upper_dept_nm as deptNm,
+		    emp_count as empCount,
+		    workTimeMin,
+		    NVL(ROUND(workTimeMin / NULLIF(countWork, 0)), 0) AS avgWorkTimeMin,
+		    overTimeMin,
+		    countWork,
+		    countLate,
+		    countAnnualLeave,
+		
+		    -- 비율 계산
+		    NVL(ROUND(countWork / NULLIF((countWork + countLate + countAnnualLeave),0) * 100, 2), 0) AS workRatio,
+		    NVL(ROUND(countLate / NULLIF((countWork + countLate + countAnnualLeave),0) * 100, 2), 0) AS lateRatio,
+		    NVL(ROUND(countAnnualLeave / NULLIF((countWork + countLate + countAnnualLeave),0) * 100, 2), 0) AS annualRatio
+		FROM (SELECT 
+		    u.dept_no as upper_dept_no,
+		    u.dept_nm as upper_dept_nm,
+		    
+		    -- 기록 수
+		    COUNT(wr.work_rcord_no) as work_cnt,
+		    
+		    -- 인원 수
+		    COUNT(DISTINCT e.emp_no) AS emp_count,
+		    
+		    -- 평균 근무시간
+		    SUM(CASE 
+		      WHEN end_time IS NOT NULL AND begin_time IS NOT NULL THEN 
+		      CASE 
+		      WHEN ( (TO_NUMBER(SUBSTR(end_time,1,2))*60 + TO_NUMBER(SUBSTR(end_time,3,2))) 
+		           - (TO_NUMBER(SUBSTR(begin_time,1,2))*60 + TO_NUMBER(SUBSTR(begin_time,3,2))) ) >= 300
+		      THEN ( (TO_NUMBER(SUBSTR(end_time,1,2))*60 + TO_NUMBER(SUBSTR(end_time,3,2))) 
+		           - (TO_NUMBER(SUBSTR(begin_time,1,2))*60 + TO_NUMBER(SUBSTR(begin_time,3,2))) ) - 60
+		      ELSE ( (TO_NUMBER(SUBSTR(end_time,1,2))*60 + TO_NUMBER(SUBSTR(end_time,3,2))) 
+		           - (TO_NUMBER(SUBSTR(begin_time,1,2))*60 + TO_NUMBER(SUBSTR(begin_time,3,2))) )
+		    END
+		      ELSE 0
+		    END) AS workTimeMin,
+		    
+		    -- 승인된 연장근무 시간 (없으면 0)
+		    SUM(CASE 
+		         WHEN sd.doc_process_sttus = '09003' THEN
+		             CASE 
+		                 -- 정규 근무제: 18시 이후
+		                 WHEN wt.work_ty_no = 1 AND wr.begin_time IS NOT NULL AND wr.end_time IS NOT NULL    
+		                 THEN GREATEST(0, (TO_NUMBER(SUBSTR(end_time, 1, 2)) * 60 + TO_NUMBER(SUBSTR(end_time, 3, 2)) - 1080))
+		                 -- 유연 근무제: 9시간 초과
+		                 WHEN wt.work_ty_no = 2 AND wr.begin_time IS NOT NULL AND wr.end_time IS NOT NULL
+		                 THEN GREATEST(
+		                          0,
+		                          (TO_NUMBER(SUBSTR(end_time,1,2))*60 + TO_NUMBER(SUBSTR(end_time,3,2)))
+		                        - (TO_NUMBER(SUBSTR(begin_time,1,2))*60 + TO_NUMBER(SUBSTR(begin_time,3,2)))
+		                        - 540
+		                      )
+		             END
+		         ELSE 0
+		    END) AS overTimeMin,
+		    -- 출근일수 / 지각횟수 / 연차일수
+		    COUNT(CASE WHEN begin_time IS NOT NULL and end_time IS NOT NULL THEN 1 END) AS countWork,
+		    COUNT(CASE WHEN wr.work_sttus = '01002' and begin_time IS NOT NULL THEN 1 END) AS countLate,
+		    COUNT(CASE WHEN wr.work_sttus = '01003' THEN 1 END) as countAnnualLeave
+		    
+		    
+		FROM dept d
+		INNER JOIN emp e ON d.dept_no = e.dept_no
+		INNER JOIN work_ty wt ON d.work_ty_no = wt.work_ty_no
+		LEFT OUTER JOIN work_rcord wr ON (e.emp_no = wr.emp_no 
+		<choose>
+			<when test="range != null and range eq 'month'">
+				<![CDATA[
+					AND (WORK_YMD >= TO_CHAR(ADD_MONTHS(TO_DATE(#{baseDay}, 'YYYYMMDD'), -1), 'YYYYMMDD') 
+					AND WORK_YMD <= #{baseDay} )
+				]]>
+			</when>
+			<when test="range != null and range eq 'quater'">
+				<![CDATA[
+					AND (WORK_YMD >= TO_CHAR(ADD_MONTHS(TO_DATE(#{baseDay}, 'YYYYMMDD'), -3), 'YYYYMMDD') 
+					AND WORK_YMD <= #{baseDay} )
+				]]>	
+			</when>
+			<when test="range != null and range eq'year'">
+				<![CDATA[
+					AND (WORK_YMD >= TO_CHAR(ADD_MONTHS(TO_DATE(#{baseDay}, 'YYYYMMDD'), -12), 'YYYYMMDD') 
+					AND WORK_YMD <= #{baseDay} )
+				]]>
+			</when>
+		</choose>
+		)
+		LEFT OUTER JOIN dept u ON d.upper_dept_no = u.dept_no
+		LEFT JOIN sanctn_doc sd 
+		       ON sd.emp_no = wr.emp_no 
+		      AND TO_CHAR(sd.wrt_dt, 'YYYYMMDD') = wr.work_ymd 
+		      AND sd.form_no = 103
+		WHERE d.UPPER_DEPT_NO IS NOT NULL
+		GROUP BY u.dept_no, u.dept_nm
+		ORDER BY u.dept_no
+		) 
+
+	</select>
+
+	<select id="companyWorkTypeAnalytics" parameterType="map" resultType="kr.or.ddit.vo.attendance.CompanyAnalyticsVO">
+		SELECT WORK_TY_NM, COUNT(WORK_TY_NM) as emp_count
+		FROM WORK_TY wt
+		INNER JOIN DEPT d ON wt.work_ty_no = d.work_ty_no
+		INNER JOIN EMP e ON (d.dept_no = e.dept_no
+		<choose>
+			<when test="range != null and range eq 'month'">
+				<![CDATA[
+					AND (RSGNTN_YMD IS NULL OR RSGNTN_YMD >= TO_CHAR(ADD_MONTHS(TO_DATE(#{baseDay}, 'YYYYMMDD'), -1), 'YYYYMMDD'))
+				]]>
+			</when>
+			<when test="range != null and range eq 'quater'">
+				<![CDATA[
+					AND (RSGNTN_YMD IS NULL OR RSGNTN_YMD >= TO_CHAR(ADD_MONTHS(TO_DATE(#{baseDay}, 'YYYYMMDD'), -3), 'YYYYMMDD'))
+				]]>	
+			</when>
+			<when test="range != null and range eq'year'">
+				<![CDATA[
+					AND (RSGNTN_YMD IS NULL OR RSGNTN_YMD >= TO_CHAR(ADD_MONTHS(TO_DATE(#{baseDay}, 'YYYYMMDD'), -12), 'YYYYMMDD'))
+				]]>
+			</when>
+		</choose>
+		)
+		GROUP BY WORK_TY_NM
+	</select>
+	
+	<select id="getCountCompanyVacation" parameterType="kr.or.ddit.vo.attendance.PaginationAttdInfoVO" resultType="int">
+		SELECT
+		    NVL(SUM(COUNT(DISTINCT ys.emp_no)), 0)
+		FROM yryc_sttus ys 
+		INNER JOIN emp e ON ys.emp_no = e.emp_no
+		WHERE issu_yr = #{year}
+		<if test="empNm != null and empNm != ''">
+			AND emp_nm LIKE '%' || #{empNm} || '%'
+		</if>
+		<if test="deptNo != null and deptNo !=''">
+			AND dept_no = #{deptNo}
+		</if>
+		GROUP BY ys.emp_no, issu_yr, tot_yryc_co
+	</select>
+	
+	<select id="getCompanyVacationRecord" parameterType="kr.or.ddit.vo.attendance.PaginationAttdInfoVO" resultType="kr.or.ddit.vo.attendance.CompanyYrycSttusVO">
+		SELECT
+		    ys.emp_no,
+		    emp_nm,
+		    dept_nm,
+	        cmmn_cd_nm as jdbcNm,
+		    issu_yr,
+		    tot_yryc_co AS tot_yryc_co,           -- 사원 총 연차
+		    SUM(NVL(use_co,0)) AS use_co,         -- 사원 사용 연차
+		    (SELECT 
+		        SUM(CASE WHEN use_co IS NULL THEN tot_yryc_co 
+		        ELSE 0 
+		        END)
+		    FROM yryc_sttus WHERE issu_yr = #{year}) AS companyTotYrycCo, -- 전사 총 연차
+		    (SELECT SUM(NVL(use_co,0)) FROM yryc_sttus WHERE issu_yr = #{year}) AS companyUseCo  -- 전사 총 사용 연차
+		FROM yryc_sttus ys
+		INNER JOIN emp e ON e.emp_no = ys.emp_no
+		INNER JOIN DEPT d ON e.dept_no = d.dept_no
+	    INNER JOIN cmmn_cd cmd ON e.jbgd_cd = cmd.cmmn_cd_id
+		WHERE issu_yr = #{year}
+		<if test="empNm != null and empNm != ''">
+			AND e.emp_nm LIKE ('%' || #{empNm} || '%')
+		</if>
+		<if test="deptNo != null and deptNo !=''">
+			AND e.dept_no = #{deptNo}
+		</if>
+		GROUP BY ys.emp_no, emp_nm, dept_nm, cmmn_cd_nm, issu_yr, tot_yryc_co
+		ORDER BY ys.emp_no
+	</select>
+	
+	<select id="getAllEmpRequestListCount" parameterType="kr.or.ddit.vo.attendance.PaginationAttdInfoVO" resultType="kr.or.ddit.vo.attendance.CountRequestVO">
+		SELECT 
+		    COUNT(wr.work_hist_mdfnc_requst_no) as totalCount,
+            COUNT(CASE WHEN requst_sttus = '22002' THEN 1 END) AS pendingCount,
+            COUNT(CASE WHEN requst_sttus = '22003' THEN 1 END) AS approvedCount,
+            COUNT(CASE WHEN requst_sttus = '22004' THEN 1 END) AS rejectCount
+		FROM
+		    work_hist_mdfnc_requst wr
+		INNER JOIN work_rcord w ON (wr.work_rcord_no = w.work_rcord_no)    
+		INNER JOIN emp e on (w.emp_no = e.emp_no)
+		WHERE 1 = 1
+		<if test="status != null and status != ''">
+			AND requst_sttus = #{status}
+		</if>
+		<if test="deptNo != null and deptNo != 0">
+			AND e.dept_no = #{deptNo}
+		</if>
+		<if test="empNm != null and empNm != ''">
+			AND e.emp_nm LIKE '%' || #{empNm} || '%'
+		</if>
+	</select>
+
+	<select id="getAllEmpRequestList" parameterType="kr.or.ddit.vo.attendance.PaginationAttdInfoVO" resultType="kr.or.ddit.vo.attendance.WorkHistMdfncRequstVO">
+		SELECT b.*
+		FROM (
+			SELECT a.*, row_number() over(order by a.work_hist_mdfnc_requst_no desc) rnum
+				FROM (SELECT 
+				    work_hist_mdfnc_requst_no,
+				    wr.work_rcord_no,
+				    requst_resn,
+		            TO_CHAR(TO_DATE(wr.requst_reg_ymd,'YYYYMMDD'), 'YYYY-MM-DD') AS requst_reg_ymd,
+		            TO_CHAR(TO_DATE(w.work_ymd,'YYYYMMDD'), 'YYYY-MM-DD') AS work_ymd,
+		            NVL2(requst_time, SUBSTR(requst_time, 1, 2) || ':' || SUBSTR(requst_time, 3, 2), '--:--') AS requst_time,
+		            CASE WHEN requst_ty = '23001' THEN NVL2(w.begin_time, SUBSTR(w.begin_time, 1, 2) || ':' || SUBSTR(w.begin_time, 3, 2), '--:--') 
+		                  WHEN requst_ty = '23002' THEN NVL2(w.end_time, SUBSTR(w.end_time, 1, 2) || ':' || SUBSTR(w.end_time, 3, 2), '--:--') 
+		            END 
+		            AS default_time,
+				    wr.file_group_no,
+				    cmd2.cmmn_cd_nm as requst_ty,
+				    cmd.cmmn_cd_nm as requst_sttus,
+				    return_resn,
+				    saved_nm,
+				    emp_nm,
+				    dept_nm
+				FROM
+				    work_hist_mdfnc_requst wr
+				INNER JOIN cmmn_cd cmd ON (wr.requst_sttus = cmd.cmmn_cd_id)
+				INNER JOIN cmmn_cd cmd2 ON (wr.requst_ty = cmd2.cmmn_cd_id)
+				INNER JOIN work_rcord w ON (wr.work_rcord_no = w.work_rcord_no)
+				INNER JOIN emp e on (w.emp_no = e.emp_no)
+				INNER JOIN dept d on (e.dept_no = d.dept_no)
+				LEFT OUTER JOIN files f ON (wr.file_group_no = f.file_group_no)
+				WHERE 1 = 1
+				<if test="status != null and status != ''">
+					AND requst_sttus = #{status}
+				</if>
+				<if test="deptNo != null and deptNo != 0">
+					AND e.dept_no = #{deptNo}
+				</if>
+				<if test="empNm != null and empNm != ''">
+					AND e.emp_nm LIKE '%' || #{empNm} || '%'
+				</if>
+				ORDER BY work_hist_mdfnc_requst_no desc
+			) a
+		) b
+	    <![CDATA[
+		WHERE b.rnum >= #{startRow} AND b.rnum <= #{endRow}
+		]]>
+	</select>	
+	
+	<select id="getEmpRequestListCount" parameterType="kr.or.ddit.vo.attendance.PaginationAttdInfoVO"  resultType="kr.or.ddit.vo.attendance.CountRequestVO">
+		SELECT 
+		    COUNT(wr.work_hist_mdfnc_requst_no) as totalCount,
+            COUNT(CASE WHEN requst_sttus = '22002' THEN 1 END) AS pendingCount,
+            COUNT(CASE WHEN requst_sttus = '22003' THEN 1 END) AS approvedCount,
+            COUNT(CASE WHEN requst_sttus = '22004' THEN 1 END) AS rejectCount
+		FROM
+		    work_hist_mdfnc_requst wr
+		INNER JOIN work_rcord w ON (wr.work_rcord_no = w.work_rcord_no)    
+		INNER JOIN emp e on (w.emp_no = e.emp_no)
+		WHERE w.emp_no = #{empNo}
+		<if test="status != null and status != ''">
+			AND requst_sttus = #{status}
+		</if>
+		<if test="deptNo != null and deptNo != 0">
+			AND e.dept_no = #{deptNo}
+		</if>
+		<if test="empNm != null and empNm != ''">
+			AND e.emp_nm LIKE '%' || #{empNm} || '%'
+		</if>
+	</select>
+	
+	<select id="getEmpRequestList" parameterType="kr.or.ddit.vo.attendance.PaginationAttdInfoVO" resultType="kr.or.ddit.vo.attendance.WorkHistMdfncRequstVO">
+		SELECT b.*
+		FROM (
+			SELECT a.*, row_number() over(order by a.work_hist_mdfnc_requst_no asc) rnum
+				FROM (SELECT 
+				    work_hist_mdfnc_requst_no,
+				    wr.work_rcord_no,
+				    requst_resn,
+		            TO_CHAR(TO_DATE(wr.requst_reg_ymd,'YYYYMMDD'), 'YYYY-MM-DD') AS requst_reg_ymd,
+		            TO_CHAR(TO_DATE(w.work_ymd,'YYYYMMDD'), 'YYYY-MM-DD') AS work_ymd,
+		            NVL2(requst_time, SUBSTR(requst_time, 1, 2) || ':' || SUBSTR(requst_time, 3, 2), '--:--') AS requst_time,
+		            CASE WHEN requst_ty = '23001' THEN NVL2(w.begin_time, SUBSTR(w.begin_time, 1, 2) || ':' || SUBSTR(w.begin_time, 3, 2), '--:--') 
+		                  WHEN requst_ty = '23002' THEN NVL2(w.end_time, SUBSTR(w.end_time, 1, 2) || ':' || SUBSTR(w.end_time, 3, 2), '--:--') 
+		            END 
+		            AS default_time,
+				    wr.file_group_no,
+				    cmd2.cmmn_cd_nm as requst_ty,
+				    cmd.cmmn_cd_nm as requst_sttus,
+				    return_resn,
+				    saved_nm,
+				    emp_nm,
+				    dept_nm
+				FROM
+				    work_hist_mdfnc_requst wr
+				INNER JOIN cmmn_cd cmd ON (wr.requst_sttus = cmd.cmmn_cd_id)
+				INNER JOIN cmmn_cd cmd2 ON (wr.requst_ty = cmd2.cmmn_cd_id)
+				INNER JOIN work_rcord w ON (wr.work_rcord_no = w.work_rcord_no)
+				INNER JOIN emp e on (w.emp_no = e.emp_no)
+				INNER JOIN dept d on (e.dept_no = d.dept_no)
+				LEFT OUTER JOIN files f ON (wr.file_group_no = f.file_group_no)
+				WHERE w.emp_no = #{empNo}
+				<if test="status != null and status != ''">
+					AND requst_sttus = #{status}
+				</if>
+				<if test="deptNo != null and deptNo != 0">
+					AND e.dept_no = #{deptNo}
+				</if>
+				<if test="empNm != null and empNm != ''">
+					AND e.emp_nm LIKE '%' || #{empNm} || '%'
+				</if>
+				ORDER BY work_hist_mdfnc_requst_no desc
+			) a
+		) b
+	    <![CDATA[
+		WHERE b.rnum >= #{startRow} AND b.rnum <= #{endRow}
+		]]>
+		ORDER BY b.work_hist_mdfnc_requst_no desc
+	</select>	
+	
+	<select id="getRequestDetail" parameterType="int" resultType="kr.or.ddit.vo.attendance.WorkHistMdfncRequstVO">
+		SELECT 
+		    work_hist_mdfnc_requst_no,
+		    wr.work_rcord_no,
+		    requst_resn,
+            TO_CHAR(TO_DATE(wr.requst_reg_ymd,'YYYYMMDD'), 'YYYY-MM-DD') AS requst_reg_ymd,
+            TO_CHAR(TO_DATE(w.work_ymd,'YYYYMMDD'), 'YYYY-MM-DD') AS work_ymd,
+            NVL2(requst_time, SUBSTR(requst_time, 1, 2) || ':' || SUBSTR(requst_time, 3, 2), '--:--') AS requst_time,
+            CASE WHEN requst_ty = '23001' THEN NVL2(w.begin_time, SUBSTR(w.begin_time, 1, 2) || ':' || SUBSTR(w.begin_time, 3, 2), '--:--') 
+                  WHEN requst_ty = '23002' THEN NVL2(w.end_time, SUBSTR(w.end_time, 1, 2) || ':' || SUBSTR(w.end_time, 3, 2), '--:--') 
+            END 
+            AS default_time,
+		    wr.file_group_no,
+		    cmd2.cmmn_cd_nm as requst_ty,
+		    cmd.cmmn_cd_nm as requst_sttus,
+		    return_resn,
+		    saved_nm,
+		    original_nm,
+		    emp_nm,
+		    dept_nm
+		FROM
+		    work_hist_mdfnc_requst wr
+		INNER JOIN cmmn_cd cmd ON (wr.requst_sttus = cmd.cmmn_cd_id)
+		INNER JOIN cmmn_cd cmd2 ON (wr.requst_ty = cmd2.cmmn_cd_id)
+		INNER JOIN work_rcord w ON (wr.work_rcord_no = w.work_rcord_no)
+		INNER JOIN emp e on (w.emp_no = e.emp_no)
+		INNER JOIN dept d on (e.dept_no = d.dept_no)
+		LEFT OUTER JOIN files f ON (wr.file_group_no = f.file_group_no)
+		WHERE work_hist_mdfnc_requst_no = #{requestNo}
+	</select>
+	
+	<update id="approveRequest" parameterType="map">
+		UPDATE WORK_HIST_MDFNC_REQUST
+		SET REQUST_STTUS = '22003'
+		WHERE WORK_HIST_MDFNC_REQUST_NO = #{requestNo}
+	</update>
+	
+	<update id="rejectRequest" parameterType="map">
+		UPDATE WORK_HIST_MDFNC_REQUST
+		SET REQUST_STTUS = '22004',
+			RETURN_RESN = #{returnResn}
+		WHERE WORK_HIST_MDFNC_REQUST_NO = #{requestNo}
+	</update>
+	
+	<update id="updateWorkRecordTime" parameterType="map">
+		UPDATE WORK_RCORD
+		SET 
+		<if test="type eq '23001'">
+			begin_time = #{time},
+		</if> 
+		<if test="type eq '23002'">
+			end_time = #{time},
+		</if> 
+		WORK_STTUS = '01001'
+		WHERE WORK_RCORD_NO = #{recordNo}
+	</update>
+	
+	<update id="updateWorkHistStatus" parameterType="map">
+		UPDATE WORK_HIST
+		SET WORK_STTUS = '01001'
+		WHERE work_rcord_no = #{recordNo}
+		AND (WORK_STTUS = '01002' OR WORK_STTUS = '01006')
+	</update>
+	
+	<select id="getUpdateRecordData" parameterType="int" resultType="map">
+		SELECT work_rcord_no as recordNo,
+			   requst_time as time,
+			   requst_ty as type
+		FROM WORK_HIST_MDFNC_REQUST
+		WHERE WORK_HIST_MDFNC_REQUST_NO = #{requestNo}
+	</select>
+	
+	<select id="getVacationEmpList" parameterType="string" resultType="kr.or.ddit.vo.EmpVO">
+		SELECT
+		    emp_no
+		FROM
+		    emp
+		WHERE 
+		    SUBSTR(jncmp_ymd, 0, 4 ) != SUBSTR(#{formatDay}, 0, 4 )
+		AND SUBSTR(jncmp_ymd, 5, 8 ) = SUBSTR(#{formatDay}, 5, 8 )
+		AND rsgntn_ymd IS NULL
+	</select>
+	
+	<insert id="insertYrycSttus" parameterType="kr.or.ddit.vo.attendance.YrycSttusVO">
+		INSERT INTO yryc_sttus (
+		    yryc_sttus_no,
+		    emp_no,
+		    issu_yr,
+		    tot_yryc_co,
+		    use_co,
+		    start_dt,
+		    end_dt
+		) VALUES (
+		    SEQ_YRYC_STTUS.NEXTVAL,
+		    #{empNo},
+		    #{issuYr},
+		    20,
+		    null,
+		    null,
+		    null
+		)
+	</insert>
+	
+	<select id="getAttendanceEmpList" parameterType="string" resultType="kr.or.ddit.vo.EmpVO">
+		SELECT e.emp_no
+		FROM emp e
+		LEFT JOIN work_rcord wr 
+		  ON e.emp_no = wr.emp_no 
+		 AND wr.work_ymd = #{formatDay} 
+		WHERE e.rsgntn_ymd IS NULL
+		  AND wr.emp_no IS NULL
+	</select>      
+
+	
+</mapper>
